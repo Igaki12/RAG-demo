@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ニュース記事 ベクトル類似度ランキング（内積）デモ</title>
+<style>
+  :root{
+    --bg:#0f172a;         /* slate-900 */
+    --panel:#111827;      /* gray-900 */
+    --muted:#94a3b8;      /* slate-400 */
+    --text:#e5e7eb;       /* gray-200 */
+    --accent:#22d3ee;     /* cyan-400 */
+    --accent-2:#38bdf8;   /* sky-400 */
+    --ok:#34d399;         /* emerald-400 */
+    --warn:#f59e0b;       /* amber-500 */
+    --err:#f87171;        /* red-400 */
+    --chip:#1f2937;       /* gray-800 */
+    --border:#334155;     /* slate-600 */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:linear-gradient(180deg,#0b1220,#0e1530 35%,#0f172a);
+    color:var(--text); font:16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Sans", "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+  }
+  .container{max-width:1100px;margin:0 auto;padding:24px}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-size:clamp(20px,3.5vw,28px);margin:0;letter-spacing:.2px}
+  .badge{font-size:12px;color:var(--accent);border:1px solid var(--accent);padding:2px 8px;border-radius:999px;background:rgba(34,211,238,.08)}
+  .panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:16px;padding:16px}
+  .controls{display:grid;grid-template-columns:1fr;gap:12px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  textarea{
+    width:100%; min-height:110px; resize:vertical;
+    background:var(--panel); color:var(--text); border:1px solid var(--border);
+    border-radius:12px; padding:12px 14px; outline:none
+  }
+  label{font-weight:600;font-size:14px}
+  .hint{font-size:12px;color:var(--muted)}
+  .btn{
+    appearance:none; border:none; cursor:pointer; border-radius:12px;
+    padding:12px 16px; font-weight:700; letter-spacing:.3px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    color:#0b1020; transition:transform .04s ease, filter .2s ease;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{
+    background:transparent; color:var(--accent-2); border:1px solid var(--accent-2)
+  }
+  .switch{
+    display:flex; gap:10px; align-items:center; background:var(--chip);
+    padding:6px 10px; border-radius:999px; border:1px solid var(--border)
+  }
+  select, .number{
+    background:var(--panel); color:var(--text); border:1px solid var(--border);
+    border-radius:10px; padding:8px 10px
+  }
+  .status{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0 0
+  }
+  .dot{width:8px;height:8px;border-radius:50%}
+  .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New",monospace}
+  .results{margin-top:18px}
+  .card{
+    background:rgba(255,255,255,.03); border:1px solid var(--border);
+    border-radius:14px; padding:14px; margin-bottom:12px
+  }
+  .card h3{margin:0 0 6px; font-size:18px}
+  .score{
+    font-weight:800; color:var(--ok); padding:2px 8px; border-radius:999px;
+    background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.4);
+    margin-left:auto
+  }
+  .meta{display:flex; gap:8px; align-items:center; color:var(--muted); font-size:12px}
+  .rank{font-weight:900; font-size:18px; color:var(--accent)}
+  details{margin-top:6px}
+  summary{cursor:pointer; color:var(--accent-2)}
+  .small{font-size:12px;color:var(--muted)}
+  .footer{margin-top:18px;font-size:12px;color:var(--muted)}
+  .grid-eq{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
+  @media (min-width:760px){
+    .controls{grid-template-columns:1.3fr .7fr}
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ニュース記事 ベクトル類似度ランキング</h1>
+      <span class="badge">Text Embedding (MediaPipe / USE / WASM)</span>
+    </header>
+
+    <section class="panel controls">
+      <div>
+        <label for="query">検索テキスト</label>
+        <textarea id="query" placeholder="例：ウクライナ 防空システム パトリオット 供給停止の影響 など..."></textarea>
+        <div class="hint">「ベクトル化＆ランキング」を押すと、10記事すべてと検索語を埋め込み→内積（またはコサイン）スコアで並べ替えます。</div>
+      </div>
+
+      <div>
+        <div class="row">
+          <div class="switch">
+            <input type="radio" name="sim" id="sim-dot" value="dot" checked>
+            <label for="sim-dot" title="ベクトル内積（大きいほど近い）">内積</label>
+            <input type="radio" name="sim" id="sim-cos" value="cos">
+            <label for="sim-cos" title="コサイン類似度（-1〜1）">コサイン</label>
+          </div>
+          <label for="topk" class="small">上位件数</label>
+          <select id="topk">
+            <option>10</option><option>5</option><option>3</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="runBtn">ベクトル化＆ランキング</button>
+          <button class="btn secondary" id="clearBtn">クリア</button>
+        </div>
+        <div class="status mono" id="status">
+          <span class="dot warn" id="modelDot"></span><span id="modelStatus">モデル読み込み中...</span>
+        </div>
+        <div class="status mono small" id="perf"></div>
+      </div>
+    </section>
+
+    <section class="results" id="results"></section>
+
+    <div class="footer">
+      本デモは学習目的の簡易ツールです。モデル：Universal Sentence Encoder（@mediapipe/tasks-text）。記事はアップロードテキストをそのまま同梱。
+    </div>
+  </div>
+
+<script type="module">
+  import text from "https://cdn.skypack.dev/@mediapipe/tasks-text@0.10.0";
+  const { TextEmbedder, FilesetResolver } = text;
+
+  // ====== 記事データ（アップロードファイルの10本を内蔵） ======
+  // 出典：ユーザー提供のニュース記事テキスト。本文は簡易タイトルを付与し、改行を含めて埋め込みます。
+  const ARTICLES = [
+    {
+      id: 1,
+      title: "ウィンブルドン：内島/ボンダル組が第1シードに敗戦、シナー/ジョコは快勝",
+      body: `【ウィンブルドン共同】テニスのウィンブルドン選手権第４日は３日、ロンドン郊外のオールイングランド・クラブで行われ、女子ダブルス１回戦で内島萌夏（安藤証券）アンナ・ボンダル（ハンガリー）組は第１シードのカテリナ・シニアコバ（チェコ）テーラー・タウンゼント（米国）組に４―６、１―６で敗れた。加藤未唯（ザイマックス）クリスティナ・ブクサ（スペイン）組はイタリアのペアに屈した。 男子シングルス２回戦では第１シードのヤニク・シナー（イタリア）、第６シードのノバク・ジョコビッチ（セルビア）がともにストレート勝ちした。`
+    },
+    {
+      id: 2,
+      title: "2020年7月豪雨から5年：熊本・球磨川流域で追悼と防災の誓い",
+      body: `九州５県で災害関連死を含め計７９人が犠牲になった２０２０年７月の豪雨から、４日で５年となった。球磨川や支流が氾濫し、特別養護老人ホーム「千寿園」の入所者１４人を含む２５人が死亡した熊本県球磨村では、午前８時半にサイレンが鳴り、住民らが黙とうして祈りをささげた。 村には献花台が設けられ、松谷浩一村長が献花。 隣接する八代市を流れる球磨川の河川敷では、氾濫が起きた早朝に合わせて、住民ら約３０人が地元の風習にならい「安穏なれ」「一日も早い復興を」などと願いを書いた石を川に投げ入れた。行事を企画した道野紗喜子さん（４６）は知人ら４人を水害で失ったといい、「将来の災害に備えるため、風化はさせたくない」と話した。 ２０年７月の豪雨では、梅雨前線の停滞や線状降水帯の発生により、各地で川が氾濫。４日未明に大雨特別警報が発令された熊本県では６７人が死亡、いまも２人が行方不明となっている。家屋７千棟超が被害を受け、６月３０日時点で２７戸４９人が仮設住宅などに入居している。 球磨村の人口は豪雨前に比べ半減した。`
+    },
+    {
+      id: 3,
+      title: "MLB 6月の月間MVP・新人・投手：ローリー、ソト、ブラウン、ウィーラーら選出",
+      body: `【ロサンゼルス共同】米大リーグ機構は３日、６月の月間最優秀選手（ＭＶＰ）を発表し、野手部門でア・リーグは打率３割、１１本塁打、２７打点をマークしたマリナーズの捕手ローリー、ナ・リーグは打率３割２分２厘、１１本塁打、２０打点だったメッツの外野手ソトがともに初めて選ばれた。 投手部門はアが５試合で１勝０敗、防御率１・１９を記録したアストロズのブラウンが初選出。ナは５試合で２勝１敗、防御率０・５８のフィリーズのウィーラーが２度目の受賞を果たした。 月間最優秀新人はアがアスレチックスの一塁手カーツ、ナがブルワーズの先発右腕ミジオロウスキーだった。`
+    },
+    {
+      id: 4,
+      title: "大阪・大東市：自宅で68歳女性死亡、殺人の可能性で捜査",
+      body: `３日午後９時ごろ、大阪府大東市の住宅で「３階で母親が亡くなっている」と、帰宅した息子から親族を通じて１１０番があった。駆け付けた警察官が布団であおむけに倒れている女性を発見し、現場で死亡が確認された。 四條畷署によると、女性はこの家に住む佐藤和子さん（６８）。首に絞められたような痕があり、殺人事件の可能性もあるとみて捜査する。佐藤さんの夫と連絡が取れておらず、何らかの事情を知っているとみて行方を捜している。住宅は施錠され、家の中にはロープがあった。`
+    },
+    {
+      id: 5,
+      title: "米・イラン、オスロで核協議検討：米軍の攻撃後では初の直接協議か",
+      body: `【ワシントン、テヘラン共同】米ニュースサイト、アクシオスは３日、米国のウィットコフ中東担当特使が来週、ノルウェー・オスロで、イランのアラグチ外相と核問題を巡る協議を開く方向で準備を進めていると報じた。実現すれば米軍によるイラン核施設攻撃後、初の直接協議となる。関係者の話として伝えた。 トランプ米大統領は今週にイランとの協議が開かれると述べていた。米政府はイランの核開発計画の放棄を含む包括的な和平合意を目指しているが、イラン側との立場の隔たりは大きく、交渉が進展するかどうかは予断を許さない。 イラン外交筋は３日、米国との核協議は「検討中」だと述べた。`
+    },
+    {
+      id: 6,
+      title: "プーチン・トランプ電話会談：ウクライナ停戦要求に対し条件を再提示",
+      body: `【モスクワ共同】ロシアのプーチン大統領は３日、トランプ米大統領と電話会談した。ロシア側によると、トランプ氏がウクライナでの早期の戦闘終結を求めたのに対し、プーチン氏は紛争の原因を除去するという侵攻目的を放棄することはないと強調した。和平の条件としてウクライナのＮＡＴＯ加盟断念などを改めて求めた形となった。 ロシアのウシャコフ大統領補佐官によると、プーチン氏はウクライナと交渉を継続する用意があると説明。米国がウクライナへの武器供給を一時停止したことについては話し合わなかったという。 中東情勢も協議し、プーチン氏は外交を通じて解決することが重要だと指摘した。 電話は約１時間に及んだ。`
+    },
+    {
+      id: 7,
+      title: "露大統領府：米露首脳が電話協議、ウクライナ和平・中東を協議",
+      body: `【モスクワ共同】タス通信によると、ロシアのペスコフ大統領報道官は３日、プーチン大統領とトランプ米大統領が電話会談したと明らかにした。両首脳の電話会談は６月１４日以来で、ウクライナ和平や中東情勢について協議したとみられる。 米ロ首脳の電話会談は、トランプ氏が今年１月に２期目に就任した後で正式発表されているだけでも６回目。`
+    },
+    {
+      id: 8,
+      title: "シカゴ繁華街で銃乱射：4人死亡、14人負傷",
+      body: `【ニューヨーク共同】米中西部イリノイ州シカゴの繁華街で２日夜、銃乱射事件があり、２０代の男女４人が死亡、２０～３０代の１４人が負傷して病院に搬送された。米メディアが伝えた。 黒人や性的少数者らに人気がある女性ラッパーのアルバム発表を祝うパーティーが開かれていた飲食店前の路上で、何者かが銃を乱射し、車で逃走した。犯人は３人組との目撃情報もある。 同じ店の前で２０２２年１１月にも１人が死亡、３人が負傷する銃撃事件が起きていた。`
+    },
+    {
+      id: 9,
+      title: "WSJ：パトリオット用ミサイルのウクライナ輸送が停止、米の一部供給停止受け",
+      body: `【キーウ、ワシントン共同】米紙ウォールストリート・ジャーナル（ＷＳＪ）は２日、米政権がウクライナへの兵器供給の一部停止を決めたことを受け、隣国ポーランドに搬入済みの防空システム「パトリオット」用ミサイルのウクライナへの輸送が停止されたと報じた。ロシアは攻撃を激化させており、防空兵器不足が被害拡大を招く恐れがある。 ウクライナのゼレンスキー大統領は２日、「米国と防空を含む防衛支援について協議をしている。われわれは国民の安全を守らないといけない」と述べた。３日には、兵器供給停止に関して「明日か、近日中にトランプ米大統領と協議したい」と表明した。`
+    },
+    {
+      id: 10,
+      title: "王毅外相：レアアース輸出規制めぐり欧州の需要満たせると発言、独は透明性欠如を批判",
+      body: `【ベルリン共同】中国の王毅外相は３日、ベルリンで記者会見し、レアアースの輸出規制を巡り、規則に基づいた申請があれば「欧州やドイツの需要を満たすことができる」と述べた。欧州で輸出規制への懸念が強まる中、融和姿勢を強調した。 同席したドイツのワーデフール外相は輸出規制を「一方的で透明性に欠ける」と批判。王氏は、レアアースが「民生用と軍事用の両方に使われる」として輸出管理の必要があると主張した。 ワーデフール氏は、ウクライナ侵攻を続けるロシアに対する中国の協力関係に懸念を表明し、戦争継続に「重要な物品」を供給しないよう求めた。王氏は「紛争当事者に殺傷能力の高い兵器は供給していない」と話した。`
+    }
+  ];
+
+  // ====== MediaPipe TextEmbedder 準備 ======
+  const statusEl = document.getElementById('status');
+  const modelDot = document.getElementById('modelDot');
+  const modelStatus = document.getElementById('modelStatus');
+  const perfEl = document.getElementById('perf');
+
+  let textEmbedder = null;
+  let cachedArticleEmbeddings = null; // 記事10本の埋め込みを初回のみ計算＆キャッシュ
+
+  async function createEmbedder(){
+    const t0 = performance.now();
+    const resolver = await FilesetResolver.forTextTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-text@0.10.0/wasm"
+    );
+    textEmbedder = await TextEmbedder.createFromOptions(resolver, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/1/universal_sentence_encoder.tflite"
+      }
+    });
+    const t1 = performance.now();
+    modelDot.className = "dot ok";
+    modelStatus.textContent = "モデル準備OK";
+    perfEl.textContent = `modelLoad: ${(t1 - t0).toFixed(1)} ms`;
+  }
+  createEmbedder().catch(err=>{
+    modelDot.className = "dot";
+    modelStatus.textContent = "モデル読み込み失敗";
+    console.error(err);
+  });
+
+  // ====== 類似度関数 ======
+  function dot(a,b){
+    let s=0; for(let i=0;i<a.length;i++) s += a[i]*b[i]; return s;
+  }
+  function norm(a){
+    let s=0; for(let i=0;i<a.length;i++) s += a[i]*a[i]; return Math.sqrt(s);
+  }
+  function cosine(a,b){
+    const d = dot(a,b), n = norm(a)*norm(b);
+    return n===0? 0 : d/n;
+  }
+  function getFloatEmbedding(emb){
+    // MediaPipe Embedding 型：{ floatEmbedding?: number[], quantizedEmbedding?: Uint8Array }
+    if (emb.floatEmbedding) return emb.floatEmbedding;
+    if (emb.quantizedEmbedding){
+      // 一応のフォールバック（量子化→0..255を[-1,1]へ）
+      const q = emb.quantizedEmbedding; const arr = new Array(q.length);
+      for(let i=0;i<q.length;i++) arr[i] = (q[i]-128)/128;
+      return arr;
+    }
+    return [];
+  }
+
+  // ====== UI 要素 ======
+  const queryEl = document.getElementById('query');
+  const runBtn = document.getElementById('runBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const resultsEl = document.getElementById('results');
+  const topkEl = document.getElementById('topk');
+
+  runBtn.addEventListener('click', async ()=>{
+    const q = (queryEl.value||"").trim();
+    if(!q){ alert("検索テキストを入力してください"); return; }
+    if(!textEmbedder){ alert("モデル読み込み中です。数秒後にお試しください。"); return; }
+
+    resultsEl.innerHTML = `<div class="card mono">埋め込み計算中...</div>`;
+    const overallT0 = performance.now();
+
+    // 1) 検索語を埋め込み
+    const tq0 = performance.now();
+    const qRes = await textEmbedder.embed(q);
+    const tq1 = performance.now();
+    const qVec = getFloatEmbedding(qRes.embeddings[0]);
+
+    // 2) 記事10本の埋め込み（キャッシュ）
+    if(!cachedArticleEmbeddings){
+      const aT0 = performance.now();
+      cachedArticleEmbeddings = [];
+      for (const art of ARTICLES){
+        const res = await textEmbedder.embed(`${art.title}\n${art.body}`);
+        cachedArticleEmbeddings.push(getFloatEmbedding(res.embeddings[0]));
+      }
+      const aT1 = performance.now();
+      perfEl.textContent += ` | embed(10): ${(aT1 - aT0).toFixed(1)} ms`;
+    }
+
+    // 3) 類似度計算
+    const useCosine = document.getElementById('sim-cos').checked;
+    const scores = ARTICLES.map((art,idx)=>{
+      const v = cachedArticleEmbeddings[idx];
+      const s = useCosine ? cosine(qVec, v) : dot(qVec, v);
+      return { ...art, score: s };
+    });
+
+    // 4) 並べ替え（降順）
+    scores.sort((a,b)=> b.score - a.score);
+
+    // 5) 上位K表示
+    const k = parseInt(topkEl.value,10);
+    const top = scores.slice(0,k);
+
+    const overallT1 = performance.now();
+    const took = (overallT1 - overallT0).toFixed(1);
+    const tookQ = (tq1 - tq0).toFixed(1);
+    resultsEl.innerHTML = renderResults(top, useCosine);
+    perfEl.textContent += ` | queryEmbed: ${tookQ} ms | total: ${took} ms`;
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    queryEl.value = "";
+    resultsEl.innerHTML = "";
+    perfEl.textContent = "";
+  });
+
+  function renderResults(items, useCosine){
+    const unit = useCosine ? "" : ""; // 内積は単位なし、コサインは-1〜1
+    return items.map((it,idx)=>{
+      const snippet = it.body.replace(/\s+/g," ").slice(0,160) + (it.body.length>160?"…":"");
+      const scoreStr = useCosine ? it.score.toFixed(4) : it.score.toFixed(2);
+      return `
+        <article class="card">
+          <div class="grid-eq">
+            <div class="meta"><span class="rank">#${idx+1}</span><span> ${escapeHtml(it.title)}</span></div>
+            <div class="small"></div>
+            <div class="score" title="${useCosine?'cosine similarity':'dot product (inner product)'}">score: ${scoreStr}${unit}</div>
+          </div>
+          <div class="small" style="margin-top:6px">${escapeHtml(snippet)}</div>
+          <details>
+            <summary>本文を開く</summary>
+            <div style="margin-top:6px;white-space:pre-wrap">${escapeHtml(it.body)}</div>
+          </details>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+  }
+</script>
+</body>
+</html>
