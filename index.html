@@ -79,7 +79,20 @@
   .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#f6f7fb; border:1px solid var(--border); font-size:12px}
   @keyframes fadeIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
   @keyframes pop{from{opacity:0; transform:scale(.98)} to{opacity:1; transform:scale(1)}}
+  /* Entities Viz */
+  .charts{display:grid; gap:12px}
+  @media(min-width:900px){ .charts{grid-template-columns: 1fr 1fr} }
+  #entitiesCard canvas{width:100%; height:320px}
+  /* Extra viz section */
+  #entitiesPlusCard canvas{width:100%; height:320px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<!-- Chart.js 本体（UMD版） -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+<!-- chartjs-chart-wordcloud（UMD版） -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-wordcloud@4.4.4/build/index.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.1.0/dist/chartjs-chart-treemap.min.js"></script>
 </head>
 <body>
   <header>
@@ -126,7 +139,39 @@
       <h2 class="section-title">検索結果（上位7件）</h2>
       <div id="results" class="result-list"></div>
     </section>
+
+    <section class="card" id="entitiesCard" style="grid-column: 1 / -1">
+      <h2 class="section-title">エンティティ可視化（上位20）</h2>
+      <div class="hint">JSONL内の <code>entities</code> または <code>named_entities</code> を集計して可視化します（ファイル読込時に自動集計）。</div>
+      <div class="spacer"></div>
+      <div class="charts">
+        <div>
+          <div class="small muted" style="margin-bottom:6px">Word Cloud</div>
+          <canvas id="wcCanvas"></canvas>
+        </div>
+        <div>
+          <div class="small muted" style="margin-bottom:6px">Polar Area</div>
+          <canvas id="polarCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+    <section class="card" id="entitiesPlusCard" style="grid-column: 1 / -1">
+      <h2 class="section-title">その他のエンティティ可視化</h2>
+      <div class="hint">Treemap と Bubble で上位エンティティの分布を表示します。</div>
+      <div class="spacer"></div>
+      <div class="charts">
+        <div>
+          <div class="small muted" style="margin-bottom:6px">Treemap</div>
+          <canvas id="treemapCanvas"></canvas>
+        </div>
+        <div>
+          <div class="small muted" style="margin-bottom:6px">Doughnut</div>
+          <canvas id="doughnutCanvas"></canvas>
+        </div>
+      </div>
+    </section>
   </main>
+ 
 
   <div class="footer">© 2025 News RAG+Quiz — client-side demo</div>
 
@@ -171,6 +216,8 @@
   let EMBED_DIM = null;    // detected dimension
   let lastQueryVec = null; // Float32Array
   let topSeven = [];       // last search results (array of items with score)
+  let ENTITY_TOP = [];   // [ [label, count], ... ] top-N
+  let entityCharts = { wc:null, polar:null, treemap:null, bubble:null };
 
   // ------------- Helpers -------------
   const $ = sel => document.querySelector(sel);
@@ -270,6 +317,210 @@ const fmtDate = v => {
     return null;
   };
 
+  // ------------- Entities (collect & viz) -------------
+  const collectEntitiesMap = (items) => {
+    const map = new Map();
+    for (const it of items) {
+      // prefer explicit list on the raw item
+      let ents = getList(it.raw, ['entities','named_entities','Entities','Keywords','keywords']);
+      if (!ents && Array.isArray(it.entities)) ents = it.entities;
+      if (!ents) continue;
+      for (let e of ents) {
+        if (e == null) continue;
+        let s = String(e).trim();
+        if (!s) continue;
+        // ignore pure numbers or 1-char ASCII noise
+        if (/^\d+$/.test(s)) continue;
+        if (/^[ -~]$/.test(s)) continue;
+        map.set(s, (map.get(s) || 0) + 1);
+      }
+    }
+    return map;
+  };
+
+  const topNFromMap = (map, n=20) =>
+    Array.from(map.entries()).sort((a,b)=> b[1]-a[1]).slice(0,n);
+
+  const renderWordCloud = (topPairs) => {
+    const el = document.getElementById('wcCanvas');
+    if (!el) return;
+    if (entityCharts.wc) { entityCharts.wc.destroy(); entityCharts.wc = null; }
+    const labels = topPairs.map(([w])=> w);
+    const data = topPairs.map(([_,c])=> c);
+    console.log('Render WordCloud', labels, data);
+    // (20) ['トカラ列島', '気象庁', '鹿児島', '悪石島', '小宝島', 'ドル', 'ユーロ', '円', 'イラン', '東京', 'トランプ', '津波', 'マグニチュード', '日本', '米国', 'イスラエル', '広島', '鹿児島県', 'ＴＯＰＩＸ', '十島村']0: "トカラ列島"1: "気象庁"2: "鹿児島"3: "悪石島"4: "小宝島"5: "ドル"6: "ユーロ"7: "円"8: "イラン"9: "東京"10: "トランプ"11: "津波"12: "マグニチュード"13: "日本"14: "米国"15: "イスラエル"16: "広島"17: "鹿児島県"18: "ＴＯＰＩＸ"19: "十島村"length: 20[[Prototype]]: Array(0) (20) [526, 518, 491, 407, 142, 138, 133, 132, 122, 122, 97, 91, 83, 77, 71, 66, 58, 58, 58, 55]
+    try{
+      entityCharts.wc = new Chart(el.getContext('2d'), {
+        type: 'wordCloud',
+        data: { labels, datasets: [{
+          data: data.map(d => Math.round((Math.log10(d)+1)*10))
+          }]
+         },
+        options: {
+          // responsive: true,
+          responsive: false,
+          fit: true,
+          color: (ctx) => {
+            if (ctx.dataIndex === 0) return '#9b59b6'; // 紫色
+            if (ctx.dataIndex < 5) return '#6b4f4f'; // こげ茶色
+            return undefined; // その他
+          },
+          fontWeight: ctx => (ctx.dataIndex === 0 ? 'extraBold' : (ctx.dataIndex < 5 ? 'bold' : 'normal')),
+          plugins: {
+            legend: { display:false },
+            tooltip: {
+              callbacks: { label: ctx => `${ctx.label}: ${data[ctx.dataIndex]}件` }
+            }
+          },
+          elements: { word: { padding: 2, rotate: 0 } }
+        }
+      });
+    }catch(e){
+      // If plugin failed to load, write a friendly message into the canvas's parent
+      const parent = el.parentElement;
+      const note = document.createElement('div');
+      note.className = 'small muted';
+      note.textContent = 'WordCloudプラグインの読み込みに失敗したため、下のPolar Areaのみ表示しています。';
+      parent.appendChild(note);
+    }
+  };
+
+  const renderPolar = (topPairs) => {
+    const el = document.getElementById('polarCanvas');
+    if (!el) return;
+    if (entityCharts.polar) { entityCharts.polar.destroy(); entityCharts.polar = null; }
+    const labels = topPairs.map(([w])=> w);
+    const data = topPairs.map(([_,c])=> c);
+    entityCharts.polar = new Chart(el.getContext('2d'), {
+      type: 'polarArea',
+      data: { labels, datasets: [{ data }] },
+      options: {
+        responsive: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw}件` } }
+        },
+        scales: { r: { ticks: { precision:0 } } }
+      }
+    });
+  };
+
+  const renderTreemap = (topPairs) => {
+    const el = document.getElementById('treemapCanvas');
+    if (!el) return;
+    if (entityCharts.treemap) { entityCharts.treemap.destroy(); entityCharts.treemap = null; }
+    const tree = topPairs.map(([label, value]) => ({ label, value }));
+    
+    // 値の最大と最小を取得して色の濃淡を計算するために使用
+    const values = topPairs.map(([,c]) => c);
+    const maxVal = values.length > 0 ? Math.max(...values) : 0;
+    const minVal = values.length > 0 ? Math.min(...values) : 0;
+    const range = maxVal - minVal;
+
+    console.log('Render Treemap', tree);
+    /* [ { "label": "トカラ列島", "value": 526 }, ... ] */
+    try{
+      entityCharts.treemap = new Chart(el.getContext('2d'), {
+        type: 'treemap',
+        data: {
+          datasets: [{
+            tree,
+            key: 'value',
+            groups: ['label'],
+            spacing: 1,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.5)',
+            // 値に応じて背景色を動的に設定
+            backgroundColor: (ctx) => {
+              if (!ctx.raw) return '#ccc';
+              const value = ctx.raw.v;
+              // 値を0-1の範囲に正規化
+              const ratio = range > 0 ? (value - minVal) / range : 0;
+              // 明度を 75% (薄い) から 30% (濃い) の間で変化させる
+              const lightness = 75 - (ratio * 45);
+              return `hsl(220, 80%, ${lightness}%)`;
+            },
+            labels: {
+              display: true,
+              formatter: ctx => ctx.raw ? `${ctx.raw._data.label}` : '',
+              color: '#fff',
+              font: { size: 12, weight: '600' },
+              position: 'center',
+            },
+          }]
+        },
+        options: {
+          responsive: false,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display:false },
+            tooltip: {
+              callbacks: { 
+                label: c => c.raw ? `${c.raw._data.label}: ${c.raw.v}件` : ''
+              }
+            }
+          }
+        }
+      });
+    }catch(e){
+      const parent = el.parentElement;
+      const note = document.createElement('div');
+      note.className = 'small muted';
+      note.textContent = 'Treemapプラグインの読み込みに失敗しました。';
+      parent.appendChild(note);
+    }
+  };
+
+  const renderDoughnut = (topPairs) => {
+    const el = document.getElementById('doughnutCanvas');
+    if (!el) return;
+    if (entityCharts.doughnut) { entityCharts.doughnut.destroy(); entityCharts.doughnut = null; }
+    const labels = topPairs.map(([w])=> w);
+    const data = topPairs.map(([_,c])=> c);
+
+    // 値の最大と最小を取得して色の濃淡を計算するために使用
+    const maxVal = data.length > 0 ? Math.max(...data) : 0;
+    const minVal = data.length > 0 ? Math.min(...data) : 0;
+    const range = maxVal - minVal;
+
+    entityCharts.doughnut = new Chart(el.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels, 
+        datasets: [
+          {
+            data: data,
+            backgroundColor: (ctx) => {
+              if (ctx.raw == null) return '#ccc';
+              const value = ctx.raw;
+              // 値を0-1の範囲に正規化
+              const ratio = range > 0 ? (value - minVal) / range : 0;
+              // 明度を 75% (薄い) から 30% (濃い) の間で変化させる
+              const lightness = 75 - (ratio * 45);
+              return `hsl(220, 80%, ${lightness}%)`;
+            }
+          }
+        ]
+      },
+      options: {
+        responsive: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw}件` } }
+        }
+      }
+    });
+  };
+
+  const updateEntitiesViz = (items) => {
+    const map = collectEntitiesMap(items);
+    ENTITY_TOP = topNFromMap(map, 50); // collect top 50 for better distribution
+    renderWordCloud(ENTITY_TOP.slice(0,30)); // word cloud shows top 30
+    renderPolar(ENTITY_TOP.slice(0,20)); // polar area shows top 20
+    renderTreemap(ENTITY_TOP.slice(0,10)); // treemap shows top 10
+    renderDoughnut(ENTITY_TOP); // doughnut shows top 50
+  };
+
   const shuffle = (arr) => {
     const a = arr.slice();
     for (let i=a.length-1; i>0; i--) {
@@ -352,11 +603,13 @@ const fmtDate = v => {
         // Embeddings (robust key search)
         const hv = pickVector(o, ['headline_embedding','headline_embed','headline_vector','headline_vec','headline']);
         const cv = pickVector(o, ['content_embedding','content_embed','content_vector','content_vec','content','body']);
+        // Entities (optional)
+        const ents = getList(o, ['entities','named_entities','Entities','Keywords','keywords']) || [];
         // Track dimension
         if (!EMBED_DIM) EMBED_DIM = hv?.length || cv?.length || EMBED_DIM;
         items.push({
           raw:o, headline, subheadline:sub, content, date, seriesline:series,
-          hv, cv, qa: qlist
+          hv, cv, qa: qlist, entities: ents
         });
       }catch(e){
         console.warn('JSONL parse error at line', i+1, e);
@@ -534,7 +787,9 @@ const fmtDate = v => {
     if (!f) return;
     $('#fileMeta').textContent = '読み込み中…';
     DATA = await parseJSONL(f);
-    $('#fileMeta').textContent = `${f.name} | ${DATA.length}件 読込 | 次元: ${EMBED_DIM||'?'}`
+    updateEntitiesViz(DATA);
+    const uniqueEnts = new Set(DATA.flatMap(d => Array.isArray(d.entities) ? d.entities : [])).size;
+    $('#fileMeta').textContent = `${f.name} | ${DATA.length}件 読込 | 次元: ${EMBED_DIM||'?'} | エンティティ: ${uniqueEnts}種`;
   });
 
   const doSearch = async () => {
