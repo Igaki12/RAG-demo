@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JSONL → vis-network 共起ネットワーク（白基調/太字ラベル）</title>
+  <style>
+    :root{
+      --bg:#ffffff; --panel:#ffffff; --muted:#607086; --text:#111827;
+      --accent:#2f6bff; --border:#e5e9f2; --edge:#cbd5e1;
+    }
+    *{ box-sizing:border-box }
+    body{ margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif }
+    header{ padding:16px; position:sticky; top:0; background:#ffffffcc;
+      background:rgba(255,255,255,.9); backdrop-filter:saturate(140%) blur(6px);
+      border-bottom:1px solid var(--border) }
+    h1{ margin:0; font-size:clamp(18px,2.6vw,22px); letter-spacing:.02em }
+    .wrap{ max-width:1200px; margin:0 auto; padding:16px }
+    .row{ display:flex; flex-wrap:wrap; gap:12px; align-items:center }
+    .panel{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px }
+    .controls{ display:grid; gap:12px; grid-template-columns:1fr }
+    @media (min-width:880px){ .controls{ grid-template-columns:1.2fr 1fr } .grid{ grid-template-columns:2fr 1fr } }
+    .grid{ display:grid; gap:12px; grid-template-columns:1fr; margin-top:12px }
+    label{ font-size:13px; color:var(--muted) }
+    input[type="file"],input[type="text"],button,select{
+      background:#fff; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:14px }
+    input[type="range"]{ width:160px }
+    button{ cursor:pointer }
+    #network{
+      height:min(72vh,800px);
+      background:#fff; border:1px solid var(--border); border-radius:16px
+    }
+    .stat{ display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--muted) }
+    .badge{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#fff }
+    .pill{ padding:6px 10px; border-radius:999px; background:#f5f7ff; border:1px solid var(--border) }
+    .muted{ color:var(--muted) }
+    .kpi{ font-variant-numeric:tabular-nums; font-weight:700 }
+    .row .spacer{ flex:1 }
+    footer{ padding:12px; text-align:center; color:var(--muted); font-size:12px }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row">
+      <h1>JSONL → 共起ネットワーク（vis-network）</h1>
+      <div class="spacer"></div>
+      <div class="stat">
+        <div class="badge" id="stat-articles">articles: 0</div>
+        <div class="badge" id="stat-entities">entities: 0</div>
+        <div class="badge" id="stat-topn">topN: 30</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="controls">
+      <div class="panel">
+        <div class="row" style="gap:10px">
+          <label>JSONLファイルを選択（各行に <code>named_entities: ["..."]</code>）</label>
+          <input id="file" type="file" accept=".jsonl,.ndjson,.txt,application/jsonl,application/x-ndjson,text/plain" />
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label>エッジ閾値（最小共起回数）</label>
+          <input id="edgeMin" type="range" min="1" max="10" step="1" value="2" />
+          <span class="pill"><span class="muted">min co-occ:</span> <b id="edgeMinVal">2</b></span>
+
+          <label style="margin-left:12px">Top N</label>
+          <input id="topN" type="range" min="10" max="100" step="5" value="30" />
+          <span class="pill"><span class="muted">topN:</span> <b id="topNVal">30</b></span>
+
+          <div class="spacer"></div>
+          <label>ノード検索</label>
+          <input id="search" type="text" placeholder="ノード名 → Enterでハイライト" />
+          <button id="resetBtn">レイアウト初期化</button>
+          <button id="physicsBtn">物理: ON</button>
+          <button id="pngBtn">PNG保存</button>
+        </div>
+      </div>
+
+      <div class="panel" id="infoBox">
+        <div class="muted">ノード/エッジをクリックすると詳細が出ます。</div>
+        <ul id="details" style="margin:8px 0 0 1em; padding:0"></ul>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div id="network" class="panel"></div>
+      <div class="panel">
+        <div class="muted">可視化ルール</div>
+        <ul style="margin:8px 0 0 1em; line-height:1.6">
+          <li>エンティティ出現回数の上位N（初期30）。</li>
+          <li>ノードサイズ = <code>log(出現回数)</code> を値として渡し、vis-network の <code>nodes.scaling</code> でスケール。</li>
+          <li>エッジ太さ = 同一記事での共起回数（行数）。スライダで下限を変更。</li>
+          <li>ノードはドラッグ可能。クリックで出現件数表示。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>Powered by vis-network Standalone (ESM)</footer>
+
+  <!-- ESM 版（スタンドアロン）を公式CDN unpkg から import -->
+  <script type="module">
+    import { DataSet, Network } from 'https://unpkg.com/vis-network/standalone/esm/vis-network.min.js';
+    // ↑ Standalone（UMD/ESM）は公式ドキュメントの導入例に準拠。 [oai_citation:3‡visjs.github.io](https://visjs.github.io/vis-network/examples/network/basic_usage/standalone.html?utm_source=chatgpt.com)
+
+    // ---------- State ----------
+    let network, nodesDS, edgesDS, physicsOn = true;
+    let originalPositions = null;
+
+    const entityCount = new Map();    // name -> count
+    let perLineEntitySets = [];       // Array<Set<string>>
+    let topEntities = [];             // [{name,count}]
+    const edgeCountsAll = new Map();  // "A|||B" -> co-occurrence count
+
+    // ---------- Helpers ----------
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => n.toLocaleString('ja-JP');
+
+    function logValue(c){ return (!c || c <= 1) ? 0 : Math.log(c); }
+    function keyPair(a,b){ return a < b ? `${a}|||${b}` : `${b}|||${a}`; }
+
+    function extractEntities(obj){
+      const cand = obj?.named_entities ?? obj?.namedEntities ?? obj?.entities ?? [];
+      if (!Array.isArray(cand)) return [];
+      const set = new Set();
+      for (const x of cand){ const s = String(x ?? '').trim(); if (s) set.add(s); }
+      return Array.from(set);
+    }
+
+    function computeTopN(n){
+      const arr = Array.from(entityCount.entries()).map(([name,count])=>({name,count}));
+      arr.sort((a,b)=>b.count - a.count);
+      topEntities = arr.slice(0, n);
+      $('stat-entities').textContent = `entities: ${fmt(arr.length)}`;
+      $('stat-topn').textContent = `topN: ${n}`;
+      return topEntities;
+    }
+
+    function computeEdgesForTop(minCo){
+      edgeCountsAll.clear();
+      const topSet = new Set(topEntities.map(d=>d.name));
+      for (const set of perLineEntitySets){
+        const present = Array.from(set).filter(e=>topSet.has(e));
+        for (let i=0;i<present.length;i++){
+          for (let j=i+1;j<present.length;j++){
+            const k = keyPair(present[i], present[j]);
+            edgeCountsAll.set(k, (edgeCountsAll.get(k) || 0) + 1);
+          }
+        }
+      }
+      const edges = [];
+      for (const [k, v] of edgeCountsAll.entries()){
+        if (v >= minCo){
+          const [a,b] = k.split('|||');
+          edges.push({ id:k, from:a, to:b, value:v, title:`共起: ${v} 件` });
+        }
+      }
+      return edges;
+    }
+
+    function buildNodes(){
+      // ★ 太字を常時適用：font.multi='html' にして <b>…</b> で描画（公式の multi-font 設定）。 [oai_citation:4‡visjs.github.io](https://visjs.github.io/vis-network/docs/network/nodes.html)
+      return topEntities.map(d=>({
+        id: d.name,
+        label: `<b>${d.name}</b>`,
+        value: logValue(d.count),      // ノードサイズの元値
+        title: `出現: ${fmt(d.count)} 件`
+      }));
+    }
+
+    // ---------- Render ----------
+    function renderNetwork(nodes, edges){
+      const container = $('network');
+      nodesDS = new DataSet(nodes);
+      edgesDS = new DataSet(edges);
+
+      const data = { nodes: nodesDS, edges: edgesDS };
+      const options = {
+        autoResize: true,
+        interaction: { hover: true, multiselect: false, dragNodes: true },
+        physics: {
+          enabled: physicsOn,
+          stabilization: { iterations: 150 },
+          barnesHut: { gravitationalConstant: -3200, centralGravity: 0.25, springLength: 140 }
+        },
+        nodes: {
+          shape: 'dot',
+          // ★ ラベルを大きく・太く・読みやすく
+          font: {
+            size: 18,                       // 基本サイズを拡大
+            color: '#111827',               // ダークグレー
+            face: 'system-ui, "Noto Sans JP", sans-serif',
+            multi: 'html',                  // <b>, <i>, <code> の簡易マークアップを解釈
+            bold: {                         // <b> 用の太字スタイル
+              size: 20,
+              face: 'system-ui, "Noto Sans JP", sans-serif',
+              color: '#111827',
+              mod: 'bold'
+            },
+            strokeWidth: 2,                 // 白背景に合わせた縁取りで視認性UP
+            strokeColor: '#ffffff'
+          },
+          labelHighlightBold: false,        // 選択時の自動太字は無効（常時太字のため） [oai_citation:5‡visjs.github.io](https://visjs.github.io/vis-network/docs/network/nodes.html)
+          scaling: {
+            min: 12, max: 56,               // value(=log count) → ノードサイズ
+            label: { enabled: true, min: 16, max: 30, maxVisible: 32 } // ズーム時のラベル拡大レンジ  [oai_citation:6‡visjs.github.io](https://visjs.github.io/vis-network/docs/network/nodes.html)
+          },
+          borderWidth: 1,
+          color: { background: '#f8fafc', border: '#cbd5e1', highlight: { background:'#eef2ff', border:'#94a3b8' } }
+        },
+        edges: {
+          color: { color: 'var(--edge)', highlight: '#9fb6d0' },
+          smooth: { type: 'continuous', roundness: 0.25 },
+          scaling: { min: 1, max: 12 },    // value(=共起回数) を太さにスケール
+          selectionWidth: 2
+        }
+      };
+
+      network = new Network(container, data, options);
+
+      originalPositions = null;
+      network.once('stabilized', ()=>{ originalPositions = network.getPositions(); });
+
+      // クリック詳細
+      network.on('click', (params)=>{
+        const ul = $('details'); ul.innerHTML = '';
+        if (params.nodes?.length){
+          const id = params.nodes[0];
+          const c = topEntities.find(d=>d.name===id)?.count ?? 0;
+          ul.innerHTML += `<li><b>${id}</b> の出現: <span class="kpi">${fmt(c)}</span> 件</li>`;
+          const connected = network.getConnectedNodes(id);
+          const items = connected.map(n=>{
+            const k = keyPair(id, n); return { n, co: edgeCountsAll.get(k) || 0 };
+          }).sort((a,b)=>b.co-a.co).slice(0,5);
+          if (items.length){
+            ul.innerHTML += `<li>よく一緒に出る語（上位5）：</li>`;
+            ul.innerHTML += `<ul>${items.map(it=>`<li style="margin-left:.75em; color:var(--muted)">${id} – <b>${it.n}</b>：${fmt(it.co)} 件</li>`).join('')}</ul>`;
+          }
+        }else if (params.edges?.length){
+          const e = edgesDS.get(params.edges[0]);
+          ul.innerHTML += `<li><b>エッジ</b> ${e.from} – ${e.to} の共起: <span class="kpi">${fmt(e.value)}</span> 件</li>`;
+        }
+      });
+    }
+
+    // ---------- UI ----------
+    $('file').addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0]; if (!file) return;
+      const text = await file.text();
+
+      entityCount.clear(); perLineEntitySets = [];
+      const lines = text.replace(/^\uFEFF/,'').split(/\r?\n/);
+
+      let articles = 0;
+      for (const line of lines){
+        if (!line.trim()) continue;
+        try{
+          const obj = JSON.parse(line);
+          const ents = extractEntities(obj);
+          if (!ents.length) continue;
+          for (const name of ents){
+            entityCount.set(name, (entityCount.get(name)||0) + 1);
+          }
+          perLineEntitySets.push(new Set(ents));
+          articles++;
+        }catch(err){ console.warn('JSON parse error:', err); }
+      }
+      $('stat-articles').textContent = `articles: ${fmt(articles)}`;
+
+      const n = parseInt($('topN').value,10);
+      computeTopN(n);
+      const nodes = buildNodes();
+      const edges = computeEdgesForTop(parseInt($('edgeMin').value,10));
+      renderNetwork(nodes, edges);
+    });
+
+    $('edgeMin').addEventListener('input', (e)=>{
+      const v = parseInt(e.target.value,10);
+      $('edgeMinVal').textContent = v;
+      if (!nodesDS) return;
+      const edges = computeEdgesForTop(v);
+      edgesDS.clear(); edgesDS.add(edges);
+    });
+
+    $('topN').addEventListener('input', (e)=>{
+      const n = parseInt(e.target.value,10);
+      $('topNVal').textContent = n;
+      if (!entityCount.size) return;
+      computeTopN(n);
+      const nodes = buildNodes();
+      const edges = computeEdgesForTop(parseInt($('edgeMin').value,10));
+      nodesDS.clear(); nodesDS.add(nodes);
+      edgesDS.clear(); edgesDS.add(edges);
+    });
+
+    $('physicsBtn').addEventListener('click', ()=>{
+      physicsOn = !physicsOn;
+      $('physicsBtn').textContent = `物理: ${physicsOn ? 'ON' : 'OFF'}`;
+      if (network) network.setOptions({ physics: { enabled: physicsOn } });
+    });
+
+    $('resetBtn').addEventListener('click', ()=>{
+      if (!network || !originalPositions) return;
+      network.setOptions({ physics: { enabled: false } });
+      const updates = Object.entries(originalPositions).map(([id,pos])=>({ id, x: pos.x, y: pos.y }));
+      nodesDS.update(updates);
+      network.redraw();
+      physicsOn = false;
+      $('physicsBtn').textContent = '物理: OFF';
+    });
+
+    $('search').addEventListener('keydown', (e)=>{
+      if (e.key !== 'Enter') return;
+      const q = e.target.value.trim(); if (!q || !network) return;
+      const m = topEntities.find(d=>d.name.includes(q));
+      if (m){
+        network.selectNodes([m.name]);
+        network.focus(m.name, { scale: 1.1, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+        $('details').innerHTML = `<li><b>${m.name}</b> の出現: <span class="kpi">${fmt(m.count)}</span> 件</li>`;
+      }
+    });
+
+    $('pngBtn').addEventListener('click', ()=>{
+      if (!network) return;
+      try{
+        const uri = network.canvas.frame.canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = uri; a.download = 'cooccurrence_network.png'; a.click();
+      }catch(e){ alert('PNGエクスポートに失敗しました（ブラウザの制限の可能性）'); }
+    });
+  </script>
+</body>
+</html>
