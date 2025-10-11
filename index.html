@@ -620,7 +620,7 @@
         });
 
         const edges = Array.from(edgeCounts.entries())
-            .filter(([, count]) => count >= 3)
+            .filter(([, count]) => count > 1) // 共起回数2回以上のエッジのみ
             .map(([key, count]) => {
                 const [from, to] = key.split('|||');
                 return { from, to, value: count, title: `共起回数: ${count}` };
