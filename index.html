@@ -620,7 +620,7 @@
         });
 
         const edges = Array.from(edgeCounts.entries())
-            .filter(([, count]) => count > 0)
+            .filter(([, count]) => count >= 3)
             .map(([key, count]) => {
                 const [from, to] = key.split('|||');
                 return { from, to, value: count, title: `共起回数: ${count}` };
@@ -841,4 +841,3 @@
   </script>
 </body>
 </html>
-
