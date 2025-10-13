@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>App 時代を捉える</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --text: #111827;
+      --muted: #606b85;
+      --edge: #cbd5e1;
+      --glass-bg: rgb(255 255 255 / 62%);
+      --glass-border: rgb(255 255 255 / 38%);
+      --glass-shadow: 0 10px 28px rgba(17, 24, 39, .16);
+      --accent-glow: #00aaff;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", Meiryo, sans-serif
+    }
+
+    #network {
+      position: fixed;
+      inset: 0;
+      width: 100dvw;
+      height: 100dvh;
+      background: var(--bg);
+    }
+
+    .overlay {
+      position: fixed;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    .hud-card {
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      border-radius: 14px;
+    }
+
+    #hudTopLeft {
+      top: 16px;
+      left: 16px;
+      padding: 12px 14px;
+      display: grid;
+      gap: 12px;
+      max-width: min(92vw, 560px)
+    }
+
+    #hudTopLeft h1 {
+      margin: 0;
+      font-size: clamp(18px, 2.6vw, 22px);
+      letter-spacing: .02em
+    }
+
+    .file-upload-area {
+        text-align: center;
+        padding: 20px;
+    }
+
+    .file-upload-area p {
+        margin: 0 0 10px 0;
+        color: var(--muted);
+    }
+
+    .file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: .6em;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 2px dashed var(--edge);
+      background: rgb(255 255 255 / 85%);
+      cursor: pointer;
+      width: max-content;
+      transition: all 0.2s ease;
+    }
+    .file-label:hover {
+        border-color: var(--accent-glow);
+        color: var(--accent-glow);
+    }
+
+    .file-label input {
+      display: none
+    }
+
+    #date-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .date-nav-btn {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+        cursor: pointer;
+        transition: background .2s;
+    }
+    .date-nav-btn:hover:not(:disabled) {
+        background: rgb(255 255 255 / 90%);
+    }
+    .date-nav-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    #current-date-display {
+        font-size: 18px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: rgb(255 255 255 / 70%);
+        border: 1px solid var(--glass-border);
+        font-variant-numeric: tabular-nums;
+    }
+    
+    #hudBottomLeft {
+      left: 16px;
+      bottom: 16px;
+      padding: 12px 14px;
+      width: min(92vw, 520px);
+      display: none; /* Initially hidden */
+    }
+
+    #infoBox h2 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      color: var(--muted)
+    }
+
+    #details {
+      margin: .25rem 0 0 1em;
+      padding: 0;
+      font-size: 14px;
+      line-height: 1.55
+    }
+
+    /* === Modal === */
+    .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+    .modal.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, .36);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+    }
+
+    .dialog {
+      position: relative;
+      z-index: 81;
+      width: min(92vw, 720px);
+      max-height: 86vh;
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+      backdrop-filter: blur(18px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.3s;
+    }
+    .modal.visible .dialog {
+        transform: scale(1);
+    }
+
+    .dialog header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .dialog h2 { margin: 0; font-size: 18px; }
+    .dialog .close {
+      width: 36px; height: 36px; border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg); cursor: pointer;
+      font-size: 18px; line-height: 1;
+    }
+
+    .dialog-content {
+        overflow-y: auto;
+        padding-right: 10px; /* for scrollbar */
+    }
+    
+    #article-view h3 { margin-top: 0; }
+    #article-view p { line-height: 1.7; }
+    #article-actions { text-align: center; margin-top: 20px; }
+
+    .btn-primary {
+        padding: 12px 24px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 10px;
+        background-color: var(--accent-glow);
+        color: white;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 12px rgba(0, 170, 255, 0.3);
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 170, 255, 0.4);
+    }
+
+    #quiz-view {
+        text-align: center;
+    }
+    #quiz-question { font-size: 1.1em; margin-bottom: 10px; }
+    #quiz-answer {
+        background: #e9ecef;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        font-size: 1.2em;
+        font-weight: bold;
+    }
+    #quiz-feedback button {
+        font-size: 24px;
+        padding: 10px 25px;
+        border-radius: 10px;
+        border: 2px solid var(--glass-border);
+        cursor: pointer;
+        margin: 0 10px;
+        transition: transform 0.1s;
+    }
+    #quiz-feedback button:hover { transform: scale(1.1); }
+    #good-btn { background-color: #d4edda; }
+    #bad-btn { background-color: #f8d7da; }
+
+    #quiz-result {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    .result-animation {
+        animation: fadeInScale 0.5s ease-out forwards;
+    }
+    #result-text {
+        font-size: 24px;
+        font-weight: bold;
+    }
+    #result-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .copyright-notice {
+      position: fixed;
+      right: 16px;
+      bottom: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    [hidden] { display: none !important; }
+
+  </style>
+</head>
+
+<body>
+  <!-- Fullscreen Network -->
+  <div id="network" aria-label="共起ネットワーク"></div>
+
+  <!-- 左上：タイトル＋アップロード → 日付操作 -->
+  <div id="hudTopLeft" class="overlay hud-card" aria-live="polite">
+    <h1>時代を捉える</h1>
+    <div id="upload-container" class="file-upload-area">
+        <p>分析したいニュース記事のJSONLファイルをアップロードしてください。その日その時代を飾った出来事についてネットワーク図を作成します。</p>
+        <label class="file-label">
+            <input id="file" type="file" accept=".jsonl" />
+            📁 ファイルを選択
+        </label>
+    </div>
+    <div id="date-container" hidden>
+        <p style="margin:0 0 8px 0; color:var(--muted); font-size:14px;">表示する日付を選択してください</p>
+        <div id="date-controls">
+            <button id="prev-date-btn" class="date-nav-btn" title="前の日">◀</button>
+            <div id="current-date-display">YYYY-MM-DD</div>
+            <button id="next-date-btn" class="date-nav-btn" title="次の日">▶</button>
+        </div>
+    </div>
+  </div>
+
+  <!-- 左下：ノード詳細 -->
+  <div id="hudBottomLeft" class="overlay hud-card">
+    <div id="infoBox">
+      <h2>詳細</h2>
+      <div id="info-placeholder" class="muted">気になるノードをクリックしたり、引っ張ったりしてみてください</div>
+      <ul id="details"></ul>
+    </div>
+  </div>
+
+  <!-- モーダル：記事詳細 & 理解度テスト -->
+  <div id="article-modal" class="modal">
+    <div class="backdrop"></div>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <header>
+        <h2 id="modal-title">記事詳細</h2>
+        <button class="close" aria-label="閉じる">✕</button>
+      </header>
+      <div class="dialog-content">
+        <!-- Article View -->
+        <div id="article-view">
+          <h3 id="article-headline"></h3>
+          <p id="article-content"></p>
+          <div id="article-actions">
+            <button id="read-another-btn" class="btn-primary" style="margin-right: 8px;">他の記事を読む</button>
+            <button id="start-quiz-btn" class="btn-primary">理解度テストを始める</button>
+          </div>
+        </div>
+        <!-- Quiz View -->
+        <div id="quiz-view" hidden>
+          <p id="quiz-progress"></p>
+          <p id="quiz-question"></p>
+          <button id="show-answer-btn" class="btn-primary" style="margin: 20px 0;">解答を確認する</button>
+          <div id="quiz-answer" hidden></div>
+          <div id="quiz-feedback" hidden>
+            <p>記事について理解できましたか？</p>
+            <button id="good-btn">👍 理解できた</button>
+            <button id="bad-btn">👎 理解できなかった</button>
+          </div>
+          <button id="toggle-article-btn" class="btn-primary" style="margin-top: 40px;" hidden>根拠となる記事確認する</button>
+        </div>
+        <!-- Result View -->
+        <div id="quiz-result" hidden>
+            <div id="result-icon"></div>
+            <p id="result-text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="copyright-notice overlay">
+    2025 © Happyman All rights reserved.
+  </div>
+
+  <script type="module">
+    import { DataSet, Network } from 'https://unpkg.com/vis-network/standalone/esm/vis-network.min.js';
+
+    // ====== DOM Elements ======
+    const $ = (id) => document.getElementById(id);
+    const fileInput = $('file');
+    const uploadContainer = $('upload-container');
+    const dateContainer = $('date-container');
+    const prevDateBtn = $('prev-date-btn');
+    const nextDateBtn = $('next-date-btn');
+    const currentDateDisplay = $('current-date-display');
+    const networkContainer = $('network');
+    const hudBottomLeft = $('hudBottomLeft');
+    const infoPlaceholder = $('info-placeholder');
+    const detailsList = $('details');
+    // Modal elements
+    const articleModal = $('article-modal');
+    const modalTitle = $('modal-title');
+    const articleView = $('article-view');
+    const articleHeadline = $('article-headline');
+    const articleContent = $('article-content');
+    const articleActions = $('article-actions');
+    const startQuizBtn = $('start-quiz-btn');
+    const quizView = $('quiz-view');
+    const quizProgress = $('quiz-progress');
+    const quizQuestion = $('quiz-question');
+    const showAnswerBtn = $('show-answer-btn');
+    const quizAnswer = $('quiz-answer');
+    const quizFeedback = $('quiz-feedback');
+    const goodBtn = $('good-btn');
+    const badBtn = $('bad-btn');
+    const quizResult = $('quiz-result');
+    const resultIcon = $('result-icon');
+    const resultText = $('result-text');
+    // 追加
+    const readAnotherBtn = $('read-another-btn');
+    const toggleArticleBtn = $('toggle-article-btn');
+
+    // ====== State ======
+    let network;
+    let allArticles = [];
+    let articlesByDate = new Map();
+    let availableDates = [];
+    let currentDateIndex = -1;
+    let completedNodes = new Set();
+    let glowAnimationId = null;
+    // Quiz state
+    let currentQuiz = {
+        nodeId: null,
+        article: null,
+        questions: [],
+        qIndex: 0,
+        good: 0,
+        bad: 0
+    };
+    let isArticleVisibleInQuiz = false;
+
+    // ====== Helpers ======
+    const fmt = (n) => n.toLocaleString('ja-JP');
+    const logValue = (c) => (!c || c <= 1) ? 2 : Math.log(c) * 5 + 2;
+    const keyPair = (a, b) => a < b ? `${a}|||${b}` : `${b}|||${a}`;
+
+    const PALETTE = [
+      '#f8e8e8', '#fde4ec', '#ffe8e0', '#fff4da', '#f5f2d8', '#eaf7d5', '#dbf1e4', '#e5f6f9',
+      '#e6f0ff', '#ece5ff', '#efe6f5', '#f7e8ef', '#f0f7ff', '#e8fff4', '#fff0f0', '#f4f9e8'
+    ];
+    function hash(str) {
+      let h = 0;
+      for (let i = 0; i < str.length; i++) { h = Math.imul(31, h) + str.charCodeAt(i) | 0; }
+      return h;
+    }
+    function colorForSubject(code) {
+      if (!code) return '#f0f0f0';
+      const idx = Math.abs(hash(code)) % PALETTE.length;
+      return PALETTE[idx];
+    }
+    function borderFor(bg) {
+        const r = parseInt(bg.slice(1, 3), 16), g = parseInt(bg.slice(3, 5), 16), b = parseInt(bg.slice(5, 7), 16);
+        const f = 0.82;
+        const rr = Math.floor(r * f).toString(16).padStart(2, '0');
+        const gg = Math.floor(g * f).toString(16).padStart(2, '0');
+        const bb = Math.floor(b * f).toString(16).padStart(2, '0');
+        return `#${rr}${gg}${bb}`;
+    }
+
+    // ====== File Processing ======
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const text = await file.text();
+        const lines = text.split(/\r?\n/);
+
+        allArticles = [];
+        articlesByDate.clear();
+
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const obj = JSON.parse(line);
+                if (obj.date_id && obj.named_entities && obj.content) {
+                    allArticles.push(obj);
+                    const dateStr = obj.date_id.toString();
+                    if (!articlesByDate.has(dateStr)) {
+                        articlesByDate.set(dateStr, []);
+                    }
+                    articlesByDate.get(dateStr).push(obj);
+                }
+            } catch (err) {
+                console.warn('JSON parse error:', err);
+            }
+        }
+        
+        if (articlesByDate.size > 0) {
+            availableDates = Array.from(articlesByDate.keys()).sort();
+            currentDateIndex = availableDates.length - 1; // Start with the latest date
+            uploadContainer.hidden = true;
+            dateContainer.hidden = false;
+            hudBottomLeft.style.display = 'block';
+            updateDisplayForDateChange();
+            startGlowAnimation();
+        } else {
+            alert('有効なデータが含まれるJSONLファイルではありません。date_id, named_entities, contentが必要です。');
+        }
+    });
+
+    // ====== Date Navigation ======
+    function updateDisplayForDateChange() {
+        if (currentDateIndex < 0 || currentDateIndex >= availableDates.length) return;
+        
+        const currentDate = availableDates[currentDateIndex];
+        const formattedDate = `${currentDate.slice(0, 4)}-${currentDate.slice(4, 6)}-${currentDate.slice(6, 8)}`;
+        currentDateDisplay.textContent = formattedDate;
+
+        prevDateBtn.disabled = currentDateIndex === 0;
+        nextDateBtn.disabled = currentDateIndex === availableDates.length - 1;
+        
+        renderGraphForDate(currentDate);
+    }
+    
+    prevDateBtn.addEventListener('click', () => {
+        if (currentDateIndex > 0) {
+            currentDateIndex--;
+            updateDisplayForDateChange();
+        }
+    });
+    nextDateBtn.addEventListener('click', () => {
+        if (currentDateIndex < availableDates.length - 1) {
+            currentDateIndex++;
+            updateDisplayForDateChange();
+        }
+    });
+
+    // ====== Graph Rendering & Animation ======
+    function glowAnimation() {
+        const time = new Date().getTime() / 400;
+        const amplitude = 15;
+        const baseSize = 30;
+        const pulse = baseSize + amplitude * Math.sin(time);
+
+        const updates = [];
+        for (const nodeId of completedNodes) {
+            if (network && network.body.data.nodes.get(nodeId)) {
+                updates.push({
+                    id: nodeId,
+                    shadow: { enabled: true, color: '#FFD700', size: pulse, x: 0, y: 0 },
+                    color: { border: '#FFD700' },
+                    font: { bold: { mod: 'normal' } }
+                });
+
+            }
+        }
+
+        if (updates.length > 0) {
+            network.body.data.nodes.update(updates);
+        }
+        glowAnimationId = requestAnimationFrame(glowAnimation);
+    }
+
+    function startGlowAnimation() {
+        if (glowAnimationId) {
+            cancelAnimationFrame(glowAnimationId);
+        }
+        glowAnimation();
+    }
+
+    function renderGraphForDate(dateStr) {
+        const articles = articlesByDate.get(dateStr) || [];
+        if (articles.length === 0) {
+            if (network) network.setData({ nodes: [], edges: [] });
+            return;
+        }
+
+        const entityCount = new Map();
+        const entitySubjectCounts = new Map();
+
+        articles.forEach(article => {
+            const entities = [...new Set(article.named_entities)].filter(e => e.length > 1);
+            entities.forEach(entity => {
+                entityCount.set(entity, (entityCount.get(entity) || 0) + 1);
+                
+                if (!entitySubjectCounts.has(entity)) entitySubjectCounts.set(entity, new Map());
+                const subjectMap = entitySubjectCounts.get(entity);
+                if (article.subject_codes) {
+                    article.subject_codes.forEach(sc => {
+                        const code = sc.subject_matter;
+                        if(code) subjectMap.set(code, (subjectMap.get(code) || 0) + 1);
+                    });
+                }
+            });
+        });
+
+        const topEntities = Array.from(entityCount.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 50)
+            .map(d => d[0]);
+
+        const nodes = topEntities.map(entity => {
+            let dominantSubject = null;
+            let maxCount = 0;
+            const subjectMap = entitySubjectCounts.get(entity);
+            if (subjectMap) {
+                for (const [subject, count] of subjectMap.entries()) {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        dominantSubject = subject;
+                    }
+                }
+            }
+            const bgColor = colorForSubject(dominantSubject);
+            const isCompleted = completedNodes.has(entity);
+
+            return {
+                id: entity,
+                label: `<b>${entity}</b>`,
+                value: logValue(entityCount.get(entity)),
+                title: `出現回数: ${entityCount.get(entity)}`,
+                color: { background: bgColor, border: borderFor(bgColor) },
+                shadow: isCompleted ? { enabled: true, color: '#FFD700', size: 30, x:0, y:0 } : {enabled: false},
+            };
+        });
+
+        const edgeCounts = new Map();
+        const topSet = new Set(topEntities);
+        articles.forEach(article => {
+            const entitiesInArticle = [...new Set(article.named_entities)].filter(e => topSet.has(e));
+            for (let i = 0; i < entitiesInArticle.length; i++) {
+                for (let j = i + 1; j < entitiesInArticle.length; j++) {
+                    const key = keyPair(entitiesInArticle[i], entitiesInArticle[j]);
+                    edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
+                }
+            }
+        });
+
+        const edges = Array.from(edgeCounts.entries())
+            .filter(([, count]) => count > 1) // 共起回数2回以上のエッジのみ
+            .map(([key, count]) => {
+                const [from, to] = key.split('|||');
+                return { from, to, value: count, title: `共起回数: ${count}` };
+            });
+
+        const data = { nodes: new DataSet(nodes), edges: new DataSet(edges) };
+        const options = {
+          interaction: { hover: true },
+          physics: { stabilization: { iterations: 150 }, barnesHut: { gravitationalConstant: -4000 } },
+          nodes: {
+            shape: 'dot',
+            font: { multi: 'html', size: 18, strokeWidth: 3, strokeColor: 'white' },
+            scaling: { min: 15, max: 60 },
+            borderWidth: 2,
+          },
+          edges: { color: { color: '#cccccc', highlight: '#b0b0b0' }, smooth: { type: 'continuous' } }
+        };
+
+        if (!network) {
+            network = new Network(networkContainer, data, options);
+            network.on('click', handleNodeClick);
+        } else {
+            network.setData(data);
+        }
+    }
+
+    function handleNodeClick(params) {
+        detailsList.innerHTML = '';
+        if (params.nodes.length > 0) {
+            infoPlaceholder.hidden = true;
+            const nodeId = params.nodes[0];
+            const nodeData = network.body.data.nodes.get(nodeId);
+            detailsList.innerHTML = `<li><b>${nodeId}</b>: ${nodeData.title}</li>`;
+            
+            const relatedArticles = allArticles.filter(a => 
+                a.named_entities.includes(nodeId) && a.content && a.content.length > 50
+            );
+
+            if (relatedArticles.length > 0) {
+                // 本文の長い記事を優先：長さで降順ソートし、上位5件からランダムに選ぶ
+                const sortedByLength = relatedArticles
+                  .slice()
+                  .sort((a, b) => (b.content?.length || 0) - (a.content?.length || 0));
+                const topK = Math.min(5, sortedByLength.length);
+                const candidates = sortedByLength.slice(0, topK);
+                const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+
+                openArticleModal(nodeId, chosen);
+            } else {
+                 detailsList.innerHTML += `<li>詳細な関連記事が見つかりませんでした。</li>`;
+            }
+
+        } else {
+            infoPlaceholder.hidden = false;
+        }
+    }
+    
+    // ====== Modal & Quiz Logic ======
+    function openArticleModal(nodeId, article) {
+        currentQuiz.nodeId = nodeId;
+        currentQuiz.article = article;
+        modalTitle.textContent = `関連ニュース: ${nodeId}`;
+        articleHeadline.textContent = article.headline || '見出しなし';
+        articleContent.textContent = article.content;
+        
+        articleView.hidden = false;
+        quizView.hidden = true;
+        quizResult.hidden = true;
+        articleActions.hidden = false;
+        toggleArticleBtn.hidden = true;
+        isArticleVisibleInQuiz = false;
+        toggleArticleBtn.textContent = '根拠となる記事確認する';
+
+        articleModal.classList.add('visible');
+    }
+
+    function closeModal() {
+        articleModal.classList.remove('visible');
+        isArticleVisibleInQuiz = false;
+        toggleArticleBtn.hidden = true;
+        articleActions.hidden = false;
+        articleView.hidden = false;
+    }
+
+    function updateArticleVisibilityDuringQuiz(shouldShow) {
+        isArticleVisibleInQuiz = shouldShow;
+        articleView.hidden = !shouldShow;
+        toggleArticleBtn.textContent = shouldShow ? '記事を隠す' : '記事を確認する';
+    }
+
+    articleModal.querySelector('.backdrop').addEventListener('click', closeModal);
+    articleModal.querySelector('.close').addEventListener('click', closeModal);
+
+    // 追加: 他の記事を読む
+    readAnotherBtn.addEventListener('click', () => {
+        if (!currentQuiz.nodeId || !currentQuiz.article) return;
+
+        const nodeId = currentQuiz.nodeId;
+        const excludeId = currentQuiz.article.news_item_id;
+
+        const relatedArticles = allArticles.filter(a =>
+            a.named_entities.includes(nodeId) &&
+            a.content && a.content.length > 50 &&
+            a.news_item_id !== excludeId
+        );
+
+        if (relatedArticles.length === 0) {
+            alert('他の記事が見つかりませんでした。');
+            return;
+        }
+
+        // 本文の長い記事を優先：降順→上位5件からランダム
+        const sortedByLength = relatedArticles
+            .slice()
+            .sort((a, b) => (b.content?.length || 0) - (a.content?.length || 0));
+        const topK = Math.min(5, sortedByLength.length);
+        const candidates = sortedByLength.slice(0, topK);
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+
+        // Article Viewを一旦閉じてから差し替え
+        articleView.hidden = true;
+        quizView.hidden = true;
+        quizResult.hidden = true;
+
+        openArticleModal(nodeId, chosen);
+    });
+
+    startQuizBtn.addEventListener('click', () => {
+        const questions = currentQuiz.article.questions;
+        if (!questions || questions.length === 0) {
+            finishQuiz(true); 
+            return;
+        }
+        currentQuiz.questions = questions;
+        currentQuiz.qIndex = 0;
+        currentQuiz.good = 0;
+        currentQuiz.bad = 0;
+        quizResult.hidden = true;
+        quizView.hidden = false;
+        articleActions.hidden = true;
+        toggleArticleBtn.hidden = false;
+        updateArticleVisibilityDuringQuiz(false);
+        showNextQuestion();
+    });
+
+    toggleArticleBtn.addEventListener('click', () => {
+        const nextState = !isArticleVisibleInQuiz;
+        updateArticleVisibilityDuringQuiz(nextState);
+        articleActions.hidden = true;
+    });
+    
+    showAnswerBtn.addEventListener('click', () => {
+        showAnswerBtn.hidden = true;
+        quizAnswer.hidden = false;
+        quizFeedback.hidden = false;
+    });
+
+    function showNextQuestion() {
+        if (currentQuiz.qIndex >= currentQuiz.questions.length) {
+            finishQuiz();
+            return;
+        }
+        
+        showAnswerBtn.hidden = false;
+        quizAnswer.hidden = true;
+        quizFeedback.hidden = true;
+        updateArticleVisibilityDuringQuiz(false);
+
+        const q = currentQuiz.questions[currentQuiz.qIndex];
+        quizProgress.textContent = `問題 ${currentQuiz.qIndex + 1} / ${currentQuiz.questions.length}`;
+        quizQuestion.textContent = q.question;
+        quizAnswer.textContent = q.answer;
+    }
+
+    goodBtn.addEventListener('click', () => {
+        currentQuiz.good++;
+        currentQuiz.qIndex++;
+        showNextQuestion();
+    });
+
+    badBtn.addEventListener('click', () => {
+        currentQuiz.bad++;
+        currentQuiz.qIndex++;
+        showNextQuestion();
+    });
+
+    function finishQuiz(forceSuccess = false) {
+        const isSuccess = forceSuccess || currentQuiz.good >= currentQuiz.bad;
+        if (isSuccess) {
+            completedNodes.add(currentQuiz.nodeId);
+            showQuizResult(true);
+        } else {
+            const relatedArticles = allArticles.filter(a => 
+                a.named_entities.includes(currentQuiz.nodeId) && 
+                a.news_item_id !== currentQuiz.article.news_item_id && 
+                a.content.length > 50
+            );
+            if (relatedArticles.length > 0) {
+                const newArticle = relatedArticles[Math.floor(Math.random() * relatedArticles.length)];
+                showQuizResult(false, () => openArticleModal(currentQuiz.nodeId, newArticle));
+            } else {
+                showQuizResult(false, () => {
+                     alert('別の関連記事が見つかりませんでした。');
+                     closeModal();
+                });
+            }
+        }
+    }
+
+    function showQuizResult(isSuccess, callback) {
+        updateArticleVisibilityDuringQuiz(false);
+        toggleArticleBtn.hidden = true;
+        articleActions.hidden = false;
+        quizView.hidden = true;
+        quizResult.hidden = false;
+        quizResult.innerHTML = ''; 
+
+        const container = document.createElement('div');
+        container.className = 'result-animation';
+
+        if (isSuccess) {
+            container.innerHTML = `
+                <div id="result-icon">🎉</div>
+                <p id="result-text">素晴らしい！理解できましたね！</p>
+            `;
+            quizResult.appendChild(container);
+            setTimeout(() => {
+                closeModal();
+                if(callback) callback();
+            }, 2000);
+        } else {
+             container.innerHTML = `
+                <div id="result-icon">🤔</div>
+                <p id="result-text">もう少しです！別の記事で再挑戦しましょう。</p>
+            `;
+            quizResult.appendChild(container);
+            setTimeout(() => {
+                if(callback) callback();
+                else closeModal();
+            }, 2500);
+        }
+    }
+
+  </script>
+</body>
+</html>
