@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Current Affairs Quest</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: rgb(241 245 249);
+      --text: rgb(15 23 42);
+      --muted: rgb(100 116 139);
+      --edge: rgb(148 163 184);
+      --glass-bg: rgb(255 255 255 / 70%);
+      --glass-border: rgb(255 255 255 / 36%);
+      --glass-shadow: 0 24px 54px rgba(15, 23, 42, 0.16);
+      --accent: rgb(14 165 233);
+      --accent-hover: rgb(2 132 199);
+      --danger: rgb(220 38 38);
+      --transition-soft: 240ms cubic-bezier(0.22, 1, 0.36, 1);
+      --transition-fast: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", Meiryo, sans-serif;
+      max-height: 100vh;
+      overflow: hidden;
+    }
+
+    #network {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      display: none;
+      z-index: 10;
+    }
+
+    #network[data-visible="true"] {
+      display: block;
+    }
+
+    .overlay {
+      position: fixed;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    .hud-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      border-radius: 18px;
+      animation: cardReveal 0.7s var(--transition-soft) both;
+      transition: transform var(--transition-soft), box-shadow var(--transition-soft);
+    }
+
+    .hud-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 30px 68px rgba(15, 23, 42, 0.18);
+    }
+
+    #main-card {
+      top: 16px;
+      left: 16px;
+      width: min(92vw, 580px);
+      display: grid;
+      gap: 18px;
+      padding: 20px 24px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      
+    }
+
+    #main-card h1 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 26px);
+      letter-spacing: 0.02em;
+    }
+
+    #main-card p.lead {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    section {
+      display: grid;
+      gap: 12px;
+    }
+
+    section header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    section header h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.01em;
+    }
+
+    .file-upload {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      border-radius: 16px;
+      border: 2px dashed var(--edge);
+      background: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+
+    .file-upload p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .file-upload label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6em;
+      margin: 0 auto;
+      padding: 12px 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+      box-shadow: 0 18px 34px rgba(14, 165, 233, 0.22);
+    }
+
+    .file-upload label:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 22px 40px rgba(14, 165, 233, 0.26);
+    }
+
+    .file-upload input[type="file"] {
+      display: none;
+    }
+
+    .range-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .range-grid label {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .range-grid input[type="date"] {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--edge);
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .range-grid input[type="date"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+    }
+
+    .info-text {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .text-lg {
+      font-size: 18px;
+    }
+
+    .text-sm {
+      font-size: 13px;
+    }
+
+    .font-semibold {
+      font-weight: 600;
+    }
+
+    .highlight {
+      color: var(--accent-hover);
+      font-weight: 600;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5em;
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 16px 32px rgba(14, 165, 233, 0.24);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 18px 36px rgba(14, 165, 233, 0.28);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .quiz-frame {
+      display: grid;
+      gap: 16px;
+    }
+
+    .question-card {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .question-card p {
+      margin: 0;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .question-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .answer-panel {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(14, 165, 233, 0.12);
+      border: 1px solid rgba(14, 165, 233, 0.28);
+      animation: answerPulse 0.6s ease-out;
+    }
+
+    .answer-panel h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .article-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      max-height: 38vh;
+      overflow-y: auto;
+    }
+
+    .article-card h4 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .article-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .article-content p {
+      margin: 0 0 8px;
+      line-height: 1.6;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    #status-message {
+      margin: 0;
+      font-size: 14px;
+      color: var(--danger);
+    }
+
+    #network-overlay {
+      top: 20px;
+      right: 20px;
+      width: min(88vw, 420px);
+      display: none;
+      padding: 18px;
+      gap: 14px;
+    }
+
+    #network-overlay[data-visible="true"] {
+      display: grid;
+    }
+
+    #network-overlay p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(15, 23, 42, 0.4);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity var(--transition-soft), visibility 0s linear 0.3s;
+      z-index: 50;
+    }
+
+    .modal.visible {
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 0s;
+    }
+
+    .modal .dialog {
+      width: min(92vw, 680px);
+      max-height: min(86vh, 640px);
+      border-radius: 18px;
+      padding: 22px 24px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: var(--glass-shadow);
+      display: grid;
+      gap: 16px;
+      overflow-y: auto;
+      animation: dialogReveal 0.6s var(--transition-soft);
+    }
+
+    .dialog header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .dialog header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .dialog .close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color var(--transition-fast);
+    }
+
+    .dialog .close:hover {
+      color: var(--danger);
+    }
+
+    .dialog article {
+      display: grid;
+      gap: 12px;
+    }
+
+    .dialog article h4 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .dialog article time {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .dialog article .body p {
+      margin: 0 0 10px;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    @keyframes cardReveal {
+      0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.94);
+      }
+
+      60% {
+        opacity: 1;
+        transform: translateY(-4px) scale(1.02);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes dialogReveal {
+      0% {
+        opacity: 0;
+        transform: translateY(26px) scale(0.92);
+      }
+
+      70% {
+        opacity: 1;
+        transform: translateY(-6px) scale(1.01);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes answerPulse {
+      0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.96);
+        filter: blur(4px);
+      }
+
+      60% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.02);
+        filter: blur(0);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @media (max-width: 720px) {
+      body {
+        overflow-y: auto;
+      }
+
+      #main-card {
+        position: relative;
+        top: auto;
+        left: auto;
+        margin: 16px auto 80px;
+        width: min(94vw, 560px);
+      }
+
+      #network-overlay {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: min(94vw, 480px);
+        top: 16px;
+      }
+    }
+
+    /* changelog v1 (2025-06-02): quiz-first dual-path mode with network exploration and explanation reveal. */
+  </style>
+</head>
+
+<body>
+  <input type="hidden" id="build-history"
+    value="v1 created 2025-06-02 to launch quiz-first mode linking answer reveal and source exploration." />
+
+  <div id="network" aria-label="共起ネットワーク"></div>
+
+  <div id="network-overlay" class="overlay hud-card" aria-live="polite">
+    <header>
+      <h2 class="text-lg font-semibold">根拠となる記事を探す</h2>
+      <button id="return-to-quiz-btn" class="btn-secondary">クイズに戻る</button>
+    </header>
+    <p>ネットワーク図のノードを選択すると、関連する記事と本文を表示します。根拠を確認したらクイズに戻り、
+      解答を確かめる / さらに別の問題に進むことができます。</p>
+  </div>
+
+  <div id="main-card" class="overlay hud-card" aria-live="polite">
+    <div>
+      <h1>Current Affairs Quest</h1>
+      <p class="lead">アップロードしたニュースデータから日付範囲を選び、ランダムに出題される時事クイズで理解を深めましょう。
+        答えを確かめるか、ネットワーク図から根拠となる記事を探索するかを選べます。</p>
+    </div>
+
+    <section id="upload-section">
+      <header>
+        <h2>データを読み込む</h2>
+      </header>
+      <div class="file-upload">
+        <p>共起ネットワークに対応したJSONLファイルをアップロードしてください。</p>
+        <label>
+          <input id="file-input" type="file" accept=".jsonl" />
+          JSONLファイルを選択
+        </label>
+        <p>各行は <code>{"date_id":20240101,"named_entities":["..."],"content":"...","questions":[...]}</code> の形式を想定しています。</p>
+      </div>
+    </section>
+
+    <section id="range-section" hidden>
+      <header>
+        <h2>出題範囲を指定</h2>
+        <span id="range-summary" class="info-text"></span>
+      </header>
+      <div class="range-grid">
+        <label>
+          開始日
+          <input id="start-date" type="date" />
+        </label>
+        <label>
+          終了日
+          <input id="end-date" type="date" />
+        </label>
+      </div>
+      <p class="info-text">選択した期間から、クイズで出題する記事とネットワーク図を作成します。</p>
+      <div class="btn-row">
+        <button id="prepare-quiz-btn" class="btn-primary">範囲でクイズを開始</button>
+        <button id="reshuffle-btn" class="btn-secondary" disabled>別の範囲で再抽選</button>
+      </div>
+      <p id="status-message" role="status"></p>
+    </section>
+
+    <section id="quiz-section" hidden>
+      <header>
+        <h2>ランダムクイズ</h2>
+        <span id="question-count" class="info-text"></span>
+      </header>
+      <div class="quiz-frame">
+        <div class="question-card">
+          <p id="quiz-question"></p>
+          <div class="question-meta">
+            <span id="question-date"></span>
+            <span id="question-headline"></span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="show-answer-btn" class="btn-primary" disabled>解答解説を表示</button>
+          <button id="open-network-btn" class="btn-secondary" disabled>根拠となる記事を探す</button>
+        </div>
+        <div id="answer-panel" class="answer-panel" hidden>
+          <h3>解答</h3>
+          <p id="answer-text"></p>
+          <div id="explanation-block" hidden>
+            <h4 class="font-semibold text-sm">解説</h4>
+            <p id="explanation-text"></p>
+          </div>
+          <div class="article-card">
+            <div>
+              <h4 id="answer-article-headline"></h4>
+              <p id="answer-article-date"></p>
+            </div>
+            <div id="answer-article-entities" class="info-text"></div>
+            <div id="answer-article-content" class="article-content"></div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="next-question-btn" class="btn-secondary" disabled>別の問題を出題</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="article-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="dialog">
+      <header>
+        <h3 id="modal-title">関連記事</h3>
+        <button class="close" type="button" aria-label="閉じる">&times;</button>
+      </header>
+      <article>
+        <h4 id="modal-headline"></h4>
+        <time id="modal-date"></time>
+        <div id="modal-body" class="body"></div>
+      </article>
+    </div>
+  </div>
+
+  <script type="module">
+    import { DataSet, Network } from 'https://unpkg.com/vis-network/standalone/esm/vis-network.min.js';
+
+    const $ = (id) => document.getElementById(id);
+    const fileInput = $('file-input');
+    const uploadSection = $('upload-section');
+    const rangeSection = $('range-section');
+    const rangeSummary = $('range-summary');
+    const startDateInput = $('start-date');
+    const endDateInput = $('end-date');
+    const prepareQuizBtn = $('prepare-quiz-btn');
+    const reshuffleBtn = $('reshuffle-btn');
+    const statusMessage = $('status-message');
+    const quizSection = $('quiz-section');
+    const questionCount = $('question-count');
+    const quizQuestion = $('quiz-question');
+    const questionDate = $('question-date');
+    const questionHeadline = $('question-headline');
+    const showAnswerBtn = $('show-answer-btn');
+    const openNetworkBtn = $('open-network-btn');
+    const answerPanel = $('answer-panel');
+    const answerText = $('answer-text');
+    const explanationBlock = $('explanation-block');
+    const explanationText = $('explanation-text');
+    const answerArticleHeadline = $('answer-article-headline');
+    const answerArticleDate = $('answer-article-date');
+    const answerArticleEntities = $('answer-article-entities');
+    const answerArticleContent = $('answer-article-content');
+    const nextQuestionBtn = $('next-question-btn');
+    const networkContainer = $('network');
+    const networkOverlay = $('network-overlay');
+    const returnToQuizBtn = $('return-to-quiz-btn');
+    const mainCard = $('main-card');
+
+    const articleModal = $('article-modal');
+    const modalTitle = $('modal-title');
+    const modalHeadline = $('modal-headline');
+    const modalDate = $('modal-date');
+    const modalBody = $('modal-body');
+
+    // ====== State ======
+    let allArticles = [];
+    let articlesByDate = new Map();
+    let availableDates = [];
+    let currentRange = { start: null, end: null };
+    let currentRangeArticles = [];
+    let questionPool = [];
+    let currentCard = { article: null, question: null };
+    let network = null;
+    let currentNetworkKey = null;
+    let currentNetworkArticles = [];
+    let currentNetworkContext = null;
+    let renderedNetworkKey = null;
+
+    // ====== Events ======
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const lines = text.split(/\r?\n/);
+      allArticles = [];
+      articlesByDate = new Map();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (!obj.date_id || !Array.isArray(obj.named_entities) || !obj.content) continue;
+
+          const dateStr = normalizeDate(obj.date_id);
+          const entry = {
+            ...obj,
+            date_id: dateStr,
+          };
+
+          allArticles.push(entry);
+
+          if (!articlesByDate.has(dateStr)) {
+            articlesByDate.set(dateStr, []);
+          }
+          articlesByDate.get(dateStr).push(entry);
+        } catch (err) {
+          console.warn('JSON parse error:', err);
+        }
+      }
+
+      availableDates = Array.from(articlesByDate.keys()).sort();
+
+      if (availableDates.length === 0) {
+        statusMessage.textContent = '有効な記事が含まれるレコードが見つかりませんでした。';
+        return;
+      }
+
+      uploadSection.hidden = true;
+      rangeSection.hidden = false;
+      statusMessage.textContent = '';
+
+      configureDateInputs();
+      updateRangeSummary();
+    });
+
+    startDateInput.addEventListener('change', () => {
+      ensureValidRange(startDateInput, endDateInput);
+      updateRangeSummary();
+    });
+
+    endDateInput.addEventListener('change', () => {
+      ensureValidRange(startDateInput, endDateInput);
+      updateRangeSummary();
+    });
+
+    prepareQuizBtn.addEventListener('click', () => {
+      const start = startDateInput.value;
+      const end = endDateInput.value;
+
+      if (!start || !end) {
+        statusMessage.textContent = '開始日と終了日を指定してください。';
+        return;
+      }
+
+      currentRange = { start: compactDate(start), end: compactDate(end) };
+      const rangeKey = `${currentRange.start}-${currentRange.end}`;
+      currentRangeArticles = filterArticlesByRange(currentRange.start, currentRange.end);
+      currentNetworkArticles = currentRangeArticles;
+      currentNetworkKey = rangeKey;
+      currentNetworkContext = analyzeNetworkContext(currentRangeArticles);
+      questionPool = buildQuestionPool(currentRangeArticles, currentNetworkContext);
+
+      if (questionPool.length === 0) {
+        statusMessage.textContent = 'この期間にはネットワーク図に表示される条件を満たす問題がありません。日付範囲を選び直してください。';
+        quizSection.hidden = true;
+        showAnswerBtn.disabled = true;
+        openNetworkBtn.disabled = true;
+        nextQuestionBtn.disabled = true;
+        return;
+      }
+
+      statusMessage.textContent = '';
+      quizSection.hidden = false;
+      reshuffleBtn.disabled = false;
+      questionCount.textContent = `問題候補: ${questionPool.length.toLocaleString('ja-JP')}件`;
+      drawQuestion();
+    });
+
+    reshuffleBtn.addEventListener('click', () => {
+      const start = startDateInput.value;
+      const end = endDateInput.value;
+      if (!start || !end) return;
+
+      currentRange = { start: compactDate(start), end: compactDate(end) };
+      const rangeKey = `${currentRange.start}-${currentRange.end}`;
+      currentRangeArticles = filterArticlesByRange(currentRange.start, currentRange.end);
+      currentNetworkArticles = currentRangeArticles;
+      currentNetworkKey = rangeKey;
+      currentNetworkContext = analyzeNetworkContext(currentRangeArticles);
+      questionPool = buildQuestionPool(currentRangeArticles, currentNetworkContext);
+      questionCount.textContent = `問題候補: ${questionPool.length.toLocaleString('ja-JP')}件`;
+      if (questionPool.length === 0) {
+        statusMessage.textContent = 'この期間にはネットワーク図に表示される条件を満たす問題がありません。日付範囲を選び直してください。';
+        quizSection.hidden = true;
+        return;
+      }
+      statusMessage.textContent = '';
+      quizSection.hidden = false;
+      drawQuestion();
+    });
+
+    showAnswerBtn.addEventListener('click', () => {
+      if (!currentCard.article || !currentCard.question) return;
+      revealAnswer();
+    });
+
+    openNetworkBtn.addEventListener('click', () => {
+      if (!currentCard.article) return;
+      presentNetwork();
+    });
+
+    nextQuestionBtn.addEventListener('click', () => {
+      if (questionPool.length === 0) return;
+      drawQuestion();
+    });
+
+    returnToQuizBtn.addEventListener('click', () => {
+      toggleNetwork(false);
+    });
+
+    articleModal.querySelector('.close').addEventListener('click', () => {
+      articleModal.classList.remove('visible');
+    });
+
+    articleModal.addEventListener('click', (event) => {
+      if (event.target === articleModal) {
+        articleModal.classList.remove('visible');
+      }
+    });
+
+    // ====== Helpers ======
+    function configureDateInputs() {
+      const minDate = formatDate(availableDates[0]);
+      const maxDate = formatDate(availableDates[availableDates.length - 1]);
+
+      startDateInput.min = minDate;
+      startDateInput.max = maxDate;
+      endDateInput.min = minDate;
+      endDateInput.max = maxDate;
+
+      startDateInput.value = minDate;
+      endDateInput.value = maxDate;
+    }
+
+    function ensureValidRange(startInput, endInput) {
+      if (!startInput.value || !endInput.value) return;
+      if (startInput.value > endInput.value) {
+        endInput.value = startInput.value;
+      }
+    }
+
+    function updateRangeSummary() {
+      if (!startDateInput.value || !endDateInput.value) {
+        rangeSummary.textContent = '';
+        return;
+      }
+
+      const start = compactDate(startDateInput.value);
+      const end = compactDate(endDateInput.value);
+      const articles = filterArticlesByRange(start, end);
+      const context = analyzeNetworkContext(articles);
+      const pool = buildQuestionPool(articles, context);
+
+      rangeSummary.textContent = `記事: ${articles.length.toLocaleString('ja-JP')}件 / 問題候補: ${pool.length.toLocaleString('ja-JP')}件`;
+    }
+
+    function filterArticlesByRange(start, end) {
+      const result = [];
+      for (const date of availableDates) {
+        if (date >= start && date <= end) {
+          const articles = articlesByDate.get(date) || [];
+          result.push(...articles);
+        }
+      }
+      return result;
+    }
+
+    function buildQuestionPool(articles, networkContext) {
+      if (!Array.isArray(articles) || articles.length === 0) return [];
+      const context = networkContext || analyzeNetworkContext(articles);
+      if (!context || context.topEntities.length === 0 || context.networkPairs.size === 0) {
+        return [];
+      }
+
+      const pool = [];
+      for (const article of articles) {
+        if (!articleMatchesNetworkContext(article, context)) continue;
+        if (Array.isArray(article.questions)) {
+          for (const question of article.questions) {
+            if (question && (question.question || question.prompt)) {
+              pool.push({ article, question });
+            }
+          }
+        }
+      }
+      return pool;
+    }
+
+    function articleMatchesNetworkContext(article, context) {
+      if (!context || !context.topEntitySet || context.networkPairs.size === 0) return false;
+      const entities = extractEntities(article);
+      if (entities.length === 0) return false;
+
+      const hasTopEntity = entities.some(entity => context.topEntitySet.has(entity));
+      if (!hasTopEntity) return false;
+
+      for (let i = 0; i < entities.length; i++) {
+        for (let j = i + 1; j < entities.length; j++) {
+          const pairKey = makePairKey(entities[i], entities[j]);
+          if (context.networkPairs.has(pairKey)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function analyzeNetworkContext(articles) {
+      const entityCount = new Map();
+      const coOccurrence = new Map();
+
+      for (const article of articles) {
+        const entities = extractEntities(article);
+        if (entities.length === 0) continue;
+        for (const entity of entities) {
+          entityCount.set(entity, (entityCount.get(entity) || 0) + 1);
+        }
+        for (let i = 0; i < entities.length; i++) {
+          for (let j = i + 1; j < entities.length; j++) {
+            const key = makePairKey(entities[i], entities[j]);
+            coOccurrence.set(key, (coOccurrence.get(key) || 0) + 1);
+          }
+        }
+      }
+
+      const topEntities = Array.from(entityCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 60)
+        .map(([entity]) => entity);
+
+      const topEntitySet = new Set(topEntities);
+      const networkPairs = new Set();
+
+      for (const [pair, count] of coOccurrence.entries()) {
+        if (count < 2) continue;
+        const [a, b] = pair.split('|||');
+        if (topEntitySet.has(a) && topEntitySet.has(b)) {
+          networkPairs.add(pair);
+        }
+      }
+
+      return { entityCount, coOccurrence, topEntities, topEntitySet, networkPairs };
+    }
+
+    function extractEntities(article) {
+      if (!article || !Array.isArray(article.named_entities)) return [];
+      const filtered = article.named_entities
+        .filter(entity => typeof entity === 'string' && entity.trim().length > 1)
+        .map(entity => entity.trim());
+      return [...new Set(filtered)];
+    }
+
+    function makePairKey(a, b) {
+      return a < b ? `${a}|||${b}` : `${b}|||${a}`;
+    }
+
+    function drawQuestion() {
+      if (questionPool.length === 0) return;
+
+      const choice = questionPool[Math.floor(Math.random() * questionPool.length)];
+      currentCard = choice;
+      quizQuestion.textContent = choice.question.question || choice.question.prompt || '問題文が登録されていません。';
+      questionDate.textContent = `日付: ${formatDate(choice.article.date_id)}`;
+      questionHeadline.textContent = choice.article.headline ? `記事: ${choice.article.headline}` : '記事: 見出しなし';
+
+      showAnswerBtn.disabled = false;
+      openNetworkBtn.disabled = false;
+      nextQuestionBtn.disabled = false;
+
+      answerPanel.hidden = true;
+      answerText.textContent = '';
+      explanationText.textContent = '';
+      explanationBlock.hidden = true;
+      answerArticleContent.innerHTML = '';
+      answerArticleHeadline.textContent = '';
+      answerArticleDate.textContent = '';
+      answerArticleEntities.textContent = '';
+    }
+
+    function revealAnswer() {
+      const { article, question } = currentCard;
+      if (!article || !question) return;
+
+      answerText.textContent = question.answer || '解答情報が登録されていません。';
+      if (question.explanation || question.reasoning) {
+        explanationBlock.hidden = false;
+        explanationText.textContent = question.explanation || question.reasoning;
+      } else {
+        explanationBlock.hidden = true;
+        explanationText.textContent = '';
+      }
+
+      answerArticleHeadline.textContent = article.headline || '見出しなし';
+      answerArticleDate.textContent = `配信日: ${formatDate(article.date_id)}`;
+      if (Array.isArray(article.named_entities) && article.named_entities.length > 0) {
+        answerArticleEntities.textContent = `登場エンティティ: ${article.named_entities.join(', ')}`;
+      } else {
+        answerArticleEntities.textContent = '';
+      }
+
+      answerArticleContent.innerHTML = '';
+      if (article.content) {
+        const paragraphs = article.content.split(/\r?\n/).filter(Boolean);
+        if (paragraphs.length === 0) {
+          const p = document.createElement('p');
+          p.textContent = article.content;
+          answerArticleContent.appendChild(p);
+        } else {
+          for (const text of paragraphs) {
+            const p = document.createElement('p');
+            p.textContent = text;
+            answerArticleContent.appendChild(p);
+          }
+        }
+      }
+
+      answerPanel.hidden = false;
+      answerPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function presentNetwork() {
+      if (!currentRange.start || !currentRange.end) return;
+      renderNetworkForRange(currentRange.start, currentRange.end);
+      toggleNetwork(true);
+      highlightCurrentEntities();
+    }
+
+    function toggleNetwork(show) {
+      if (show) {
+        networkContainer.dataset.visible = 'true';
+        networkOverlay.dataset.visible = 'true';
+        document.body.style.overflow = 'hidden';
+        mainCard.style.display = 'none';
+      } else {
+        delete networkContainer.dataset.visible;
+        delete networkOverlay.dataset.visible;
+        document.body.style.overflow = '';
+        mainCard.style.display = '';
+      }
+    }
+
+    function renderNetworkForRange(start, end) {
+      const key = `${start}-${end}`;
+
+      if (!currentNetworkContext || currentNetworkKey !== key) {
+        const articles = filterArticlesByRange(start, end);
+        if (articles.length === 0) {
+          return;
+        }
+        currentNetworkArticles = articles;
+        currentNetworkContext = analyzeNetworkContext(articles);
+        currentNetworkKey = key;
+      }
+
+      if (!currentNetworkArticles || currentNetworkArticles.length === 0) {
+        return;
+      }
+
+      if (network && renderedNetworkKey === key) {
+        return;
+      }
+
+      const context = currentNetworkContext;
+      const nodes = context.topEntities.map(entity => {
+        const count = context.entityCount.get(entity) || 0;
+        return {
+          id: entity,
+          label: entity,
+          value: scaleValue(count),
+          title: `出現回数: ${count}`
+        };
+      });
+
+      const edges = [];
+      for (const pair of context.networkPairs) {
+        const count = context.coOccurrence.get(pair);
+        if (!count) continue;
+        const [a, b] = pair.split('|||');
+        edges.push({
+          from: a,
+          to: b,
+          value: count,
+          title: `共起回数: ${count}`
+        });
+      }
+
+      const data = {
+        nodes: new DataSet(nodes),
+        edges: new DataSet(edges)
+      };
+
+      const options = {
+        interaction: { hover: true },
+        physics: {
+          stabilization: { iterations: 120 },
+          barnesHut: { gravitationalConstant: -3800 }
+        },
+        nodes: {
+          shape: 'dot',
+          color: { background: '#e0f2fe', border: '#0284c7' },
+          borderWidth: 2,
+          font: { color: '#0f172a', size: 18 },
+          scaling: { min: 18, max: 60 }
+        },
+        edges: {
+          color: { color: '#93c5fd', highlight: '#60a5fa' },
+          smooth: { type: 'continuous' }
+        }
+      };
+
+      if (!network) {
+        network = new Network(networkContainer, data, options);
+        network.on('click', onNetworkClick);
+      } else {
+        network.setData(data);
+      }
+      renderedNetworkKey = key;
+    }
+
+    function onNetworkClick(params) {
+      handleNodeClick(params, currentNetworkArticles);
+    }
+
+    function handleNodeClick(params, articles) {
+      if (!params.nodes || params.nodes.length === 0) return;
+      const nodeId = params.nodes[0];
+      const relatedArticles = articles.filter(article =>
+        Array.isArray(article.named_entities) && article.named_entities.includes(nodeId) && article.content
+      );
+      if (relatedArticles.length === 0) return;
+      const picked = relatedArticles[Math.floor(Math.random() * relatedArticles.length)];
+      openArticleModal(nodeId, picked);
+    }
+
+    function openArticleModal(entity, article) {
+      modalTitle.textContent = `関連ノード: ${entity}`;
+      modalHeadline.textContent = article.headline || '見出しなし';
+      modalDate.textContent = formatDate(article.date_id);
+      modalBody.innerHTML = '';
+      const paragraphs = article.content.split(/\r?\n/).filter(Boolean);
+      if (paragraphs.length === 0) {
+        const p = document.createElement('p');
+        p.textContent = article.content;
+        modalBody.appendChild(p);
+      } else {
+        for (const text of paragraphs) {
+          const p = document.createElement('p');
+          p.textContent = text;
+          modalBody.appendChild(p);
+        }
+      }
+      articleModal.classList.add('visible');
+    }
+
+    function highlightCurrentEntities() {
+      if (!network || !currentCard.article) return;
+      const nodes = currentCard.article.named_entities || [];
+      const existing = nodes.filter(id => network.body.data.nodes.get(id));
+      if (existing.length > 0) {
+        network.selectNodes(existing);
+        network.focus(existing[0], { scale: 1.4, animation: true });
+      }
+    }
+
+    function scaleValue(count) {
+      if (!count || count <= 1) return 12;
+      return Math.log(count) * 12 + 12;
+    }
+
+    function normalizeDate(value) {
+      const str = String(value);
+      if (str.includes('-')) {
+        return str.replace(/-/g, '');
+      }
+      return str.padStart(8, '0');
+    }
+
+    function formatDate(value) {
+      const str = normalizeDate(value);
+      return `${str.slice(0, 4)}-${str.slice(4, 6)}-${str.slice(6, 8)}`;
+    }
+
+    function compactDate(value) {
+      return value.replace(/-/g, '');
+    }
+  </script>
+</body>
+
+</html>
