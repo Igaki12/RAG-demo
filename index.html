@@ -230,26 +230,27 @@
 <body>
   <main class="page">
     <header class="hero glass">
-      <span class="eyebrow">RAG Demo Collection</span>
-      <h1>ニュース理解アプリの目次</h1>
-      <p>ガラスモーフィズムをまとった各種 Web アプリの入り口です。ユーザーが時事ニュースを読み解いたり、ベクトル検索で記事を探したりする体験をサッと比較できます。</p>
+      <span class="eyebrow">News Network Graph Collection</span>
+      <h1>ニュース地図探究アプリの目次</h1>
+      <p>情報が雪崩のように流れる毎日、気づけば“好きなニュース”だけを追いかけていませんか？</p>
+      <p>共起ネットワークと理解度クイズで出来事のつながりを可視化。記事と問いを行き来しながら全体像をつかみ、偏りなく知識を積み上げる体験を届けます。</p>
     </header>
 
     <section class="quick-take">
       <article class="info glass">
         <h2>共通点</h2>
         <ul class="point-list">
-          <li>ニュース記事の JSONL データを読み込み、共起ネットワークで関係性を可視化。</li>
-          <li>クイズ出題と記事本文表示を行き来しながら、理解を深められる学習体験を提供。</li>
-          <li>バックグラウンドでカード UI とガラスモーフィズムを採用し、視覚的に統一。</li>
+          <li>手元のニュースデータを読み込み、人物やテーマのつながりをネットワーク図で俯瞰できます。</li>
+          <li>記事本文と理解度テストを行き来しながら、出来事の背景を整理できます。</li>
+          <li>気になったトピックからクイズ→根拠記事→再挑戦と、学びのリズムを自分で組み替えられます。</li>
         </ul>
       </article>
       <article class="info glass">
         <h2>違いの見どころ</h2>
         <ul class="point-list">
-          <li>「ニュース地図を"広げる"」は日付タイムラインとランダム出題を備えた探索重視の体験。</li>
-          <li>「ニュース地図から"時代を読み解く"」はクイズ先行で根拠記事への導線を切り替えられる二段構成。</li>
-          <li>学習フローの入り口が異なり、復習や探索のリズムを好みに合わせて選べます。</li>
+          <li>「ニュース地図を"広げる"」は日付ごとに記事を追いかけ、開いた記事から理解度クイズやランダム確認問題に挑戦できます。</li>
+          <li>「ニュース地図から"時代を読み解く"」は期間を指定してクイズを出題し、答えの根拠をネットワーク図で探せる二段構成です。</li>
+          <li>どちらもニュース地図を起点にしますが、探索を始める場所が異なり、復習や深掘りのテンポを好みに合わせて選べます。</li>
         </ul>
       </article>
     </section>
@@ -259,19 +260,19 @@
       <div class="app-grid">
         <article class="app-card glass">
           <h3><a href="commonsense-ver8.html">ニュース地図を"広げる"</a></h3>
-          <p class="summary">Tailwind を取り入れた最新 UI。アップロードしたニュースを日付ごとに可視化し、記事モーダル内で理解度テストを進められます。</p>
+            <p class="summary">やさしく学べる入門モード。ニュースを日付順に並べ、共起ネットワークで広がりを一望。記事モーダルからクイズやランダム確認に即挑戦。</p>
           <ul class="details">
-            <li><span class="label" data-icon="◎">共通</span>共起ネットワークとクイズの往復でニュース理解を深める設計。</li>
-            <li><span class="label" data-icon="△">違い</span>ランダム出題モーダルやアニメーションを加え、探索型の学習サイクルを強化。</li>
+            <li><span class="label" data-icon="◎">共通</span>ネットワーク図で見つけた記事をモーダルで読み、理解度テストや解説にすぐ切り替えられます。</li>
+            <li><span class="label" data-icon="△">違い</span>日付タイムラインとランダム出題モーダルで、気になる日を選んで出来事をハンティングできます。</li>
           </ul>
         </article>
 
         <article class="app-card glass">
           <h3><a href="current-affairs-quest-latest.html">ニュース地図から"時代を読み解く"</a></h3>
-          <p class="summary">日付範囲を指定してランダムクイズを解き、必要に応じてネットワーク図へ切り替える二段構成アプリ。クイズから根拠記事に素早く遷移できます。</p>
+            <p class="summary">少し難易度高めのモード。まずランダムクイズに挑戦し、解答のヒントとしてネットワーク図から根拠記事を探し当てる流れです。</p>
           <ul class="details">
-            <li><span class="label" data-icon="◎">共通</span>JSONL データから記事本文を抽出し、モーダルで全容を確認できます。</li>
-            <li><span class="label" data-icon="△">違い</span>クイズを先に提示し、回答前に「根拠を探す」か「答えを見る」かを選べるフローを備えています。</li>
+            <li><span class="label" data-icon="◎">共通</span>アップロードしたニュースから記事本文とクイズを紐付け、根拠と解説をまとめて確認できます。</li>
+            <li><span class="label" data-icon="△">違い</span>クイズ先行のフローで、解答前にネットワーク図へ移動して証拠記事を探すか、そのまま答えを見るか選べます。</li>
           </ul>
         </article>
       </div>
