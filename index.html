@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -138,7 +139,7 @@
       gap: 18px;
     }
 
-    section.apps > h2 {
+    section.apps>h2 {
       color: var(--muted);
       font-size: 18px;
       letter-spacing: 0.08em;
@@ -211,9 +212,10 @@
         text-align: left;
       }
 
-      section.apps > h2 {
+      section.apps>h2 {
         text-align: left;
       }
+
       .app-grid {
         grid-template-columns: 1fr;
       }
@@ -263,7 +265,7 @@
       <div class="app-grid">
         <article class="app-card glass">
           <h3><a href="commonsense-ver8.html">ニュース地図を"広げる"</a></h3>
-            <p class="summary">やさしく学べる入門モード。ニュースを日付順に並べ、共起ネットワークで広がりを一望。記事モーダルからクイズやランダム確認に即挑戦。</p>
+          <p class="summary">やさしく学べる入門モード。ニュースを日付順に並べ、共起ネットワークで広がりを一望。記事モーダルからクイズやランダム確認に即挑戦。</p>
           <ul class="details">
             <li><span class="label" data-icon="◎">共通</span>ネットワーク図で見つけた記事をモーダルで読み、理解度テストや解説にすぐ切り替えられます。</li>
             <li><span class="label" data-icon="△">違い</span>日付タイムラインとランダム出題モーダルで、気になる日を選んで出来事をハンティングできます。</li>
@@ -272,7 +274,7 @@
 
         <article class="app-card glass">
           <h3><a href="current-affairs-quest-latest.html">ニュース地図から"時代を読み解く"</a></h3>
-            <p class="summary">少し難易度高めのモード。まずランダムクイズに挑戦し、解答のヒントとしてネットワーク図から根拠記事を探し当てる流れです。</p>
+          <p class="summary">少し難易度高めのモード。まずランダムクイズに挑戦し、解答のヒントとしてネットワーク図から根拠記事を探し当てる流れです。</p>
           <ul class="details">
             <li><span class="label" data-icon="◎">共通</span>アップロードしたニュースから記事本文とクイズを紐付け、根拠と解説をまとめて確認できます。</li>
             <li><span class="label" data-icon="△">違い</span>クイズ先行のフローで、解答前にネットワーク図へ移動して証拠記事を探すか、そのまま答えを見るか選べます。</li>
@@ -283,9 +285,12 @@
           <p class="summary">ベクトル距離と固有名詞スコアをブレンドし、欲しい記事を浮かび上がらせる検索プロトタイプ。</p>
           <ul class="details">
             <li><span class="label" data-icon="◆">視点</span>Gemini Embeddingsと固有表現マッチングを掛け合わせ、関連ニュースを滑らかに並べ替えます。</li>
-            <li><span class="label" data-icon="◆">操作</span>アップロードした記事から質問候補を生み出し、モーダルで全文・関連記事を散策できます。</li>
+            <!-- <li><span class="label" data-icon="◆">操作</span>アップロードした記事から質問候補を生み出し、モーダルで全文・関連記事を散策できます。</li> -->
           </ul>
-          <p class="summary" style="font-size:12px">※ このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
+          <p class="summary" style="font-size:12px">※
+            このアプリをテストするにはAPI keyが必要です</p>
+          <p class="summary" style="font-size:12px">※
+            このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
         </article>
 
         <article class="app-card glass">
@@ -293,9 +298,12 @@
           <p class="summary">検索とクイズがひと続きになったRAG体験プロトタイプ。拾い上げたニュースで理解を確かめながら読み深めます。</p>
           <ul class="details">
             <li><span class="label" data-icon="◆">視点</span>Gemini埋め込みで再ランキングした記事を、検索→クイズ→根拠確認までワンフローで味わえる構成です。</li>
-            <li><span class="label" data-icon="◆">操作</span>上位7件のカードからモーダルを開き、理解度ボタンと解答表示を切り替えながら本文・関連ニュースを掘れます。</li>
+            <!-- <li><span class="label" data-icon="◆">操作</span>上位7件のカードからモーダルを開き、理解度ボタンと解答表示を切り替えながら本文・関連ニュースを掘れます。</li> -->
           </ul>
-          <p class="summary" style="font-size:12px">※ このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
+          <p class="summary" style="font-size:12px">※
+            このアプリをテストするにはAPI keyが必要です</p>
+          <p class="summary" style="font-size:12px">※
+            このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
         </article>
 
 
