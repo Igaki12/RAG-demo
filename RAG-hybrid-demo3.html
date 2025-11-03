@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ニュース記事ハイブリッド検索 RAG プロトタイプ</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f8f9fa;
+            --font-color: #333;
+            --card-bg-color: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --border-color: #e0e0e0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            80% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--font-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        header p {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .control-panel {
+            background-color: var(--card-bg-color);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            margin-bottom: 30px;
+            animation: fadeIn 1s ease-out;
+        }
+        
+        .upload-section, .search-section {
+            margin-bottom: 20px;
+        }
+        
+        .upload-section label, .search-section label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+
+        #file-input {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #file-input:hover {
+            border-color: var(--primary-color);
+            background-color: #f0f8ff;
+        }
+        
+        #status {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+
+        #search-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1em;
+            transition: box-shadow 0.3s ease;
+        }
+
+        #search-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+            border-color: var(--primary-color);
+        }
+
+        #search-button {
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #search-button:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        #search-button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        #results-area {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        .results-container, .questions-container {
+            min-width: 0;
+        }
+
+        .result-item {
+            background-color: var(--card-bg-color);
+            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .result-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .result-item h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+            font-size: 1.2em;
+        }
+        
+        .result-item .meta-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        
+        .result-item .meta-info span {
+            background-color: #ecf0f1;
+            padding: 3px 8px;
+            border-radius: 5px;
+        }
+        
+        .result-item .score {
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        #questions-container {
+            position: sticky;
+            top: 20px;
+        }
+
+        .question-box {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            border-left: 5px solid var(--secondary-color);
+            animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+            opacity: 0;
+        }
+        
+        h2 {
+           border-bottom: 2px solid var(--primary-color);
+           padding-bottom: 10px;
+           margin-bottom: 20px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--primary-color);
+            border: none;
+        }
+        
+        .modal-header .sub-headline {
+            font-size: 1.1em;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        .modal-body p {
+            white-space: pre-wrap;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .related-articles h4 {
+            margin-top: 30px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+        
+        .related-articles .related-article-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            background: #fdfdfd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        
+        .related-articles .related-article-btn:hover {
+            background-color: #f0f8ff;
+            border-color: var(--primary-color);
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+        }
+        
+        /* Loader */
+        .loader-overlay {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 8px solid var(--primary-color);
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .entity-hints {
+            display: none;
+            margin-top: 8px;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .entity-hints .chip {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #eef6ff;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            font-size: 0.85em;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #results-area {
+                grid-template-columns: 1fr;
+            }
+            #questions-container {
+                position: static;
+                margin-top: 30px;
+            }
+            .modal-content {
+                width: 95%;
+                margin: 5% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader" class="loader-overlay">
+        <div class="loader"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>ニュース記事ハイブリッド検索 RAGプロトタイプ</h1>
+            <p>ベクトル類似度と固有名詞の一致度を組み合わせて、関連性の高い記事を検索します。</p>
+        </header>
+
+        <div class="control-panel">
+            <div class="upload-section">
+                <label for="file-input">① JSONL形式のニュース記事ファイルをアップロード</label>
+                <input type="file" id="file-input" accept=".jsonl">
+                <div id="status"></div>
+            </div>
+            <div class="search-section">
+                <label for="search-input">② 検索フレーズを入力</label>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="例: ベラルーシで釈放された日本人" disabled>
+                    <button id="search-button" disabled>検索</button>
+                </div>
+                <div id="entity-hints" class="entity-hints"></div>
+            </div>
+        </div>
+
+        <div id="results-area">
+            <div class="results-container">
+                <h2 id="results-title" style="display: none;">検索結果</h2>
+                <div id="results"></div>
+            </div>
+            <div class="questions-container">
+                <h2 id="questions-title" style="display: none;">この記事に関する質問かも？</h2>
+                <div id="questions"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="article-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <div id="modal-body-content"></div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('file-input');
+            const searchInput = document.getElementById('search-input');
+            const searchButton = document.getElementById('search-button');
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const questionsDiv = document.getElementById('questions');
+            const resultsTitle = document.getElementById('results-title');
+            const questionsTitle = document.getElementById('questions-title');
+            const loader = document.getElementById('loader');
+            
+            const modal = document.getElementById('article-modal');
+            const modalBody = document.getElementById('modal-body-content');
+            const closeModalButton = document.querySelector('.close-button');
+
+            let newsData = [];
+            let namedEntitySet = new Set();
+            let GEMINI_API_KEY = '';
+
+            // --- 初期化処理 ---
+            function initialize() {
+                GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY');
+                if (!GEMINI_API_KEY) {
+                    GEMINI_API_KEY = prompt('Gemini APIキーを入力してください:');
+                    if (GEMINI_API_KEY) {
+                        localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
+                    } else {
+                        alert('APIキーが入力されませんでした。機能が制限されます。');
+                        return;
+                    }
+                }
+                
+                fileInput.addEventListener('change', handleFileUpload);
+                searchButton.addEventListener('click', performSearch);
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        performSearch();
+                    }
+                });
+                
+                closeModalButton.onclick = closeModal;
+                window.onclick = (event) => {
+                    if (event.target == modal) {
+                        closeModal();
+                    }
+                };
+            }
+            
+            // --- ローダー表示/非表示 ---
+            function showLoader() {
+                loader.style.display = 'block';
+            }
+            function hideLoader() {
+                loader.style.display = 'none';
+            }
+
+            // --- ファイル処理 ---
+            function handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                showLoader();
+                statusDiv.textContent = 'ファイルを読み込み中...';
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const lines = e.target.result.split('\n').filter(line => line.trim() !== '');
+                        newsData = lines.map(line => JSON.parse(line));
+                        
+                        // 固有名詞リストを作成
+                        namedEntitySet.clear();
+                        newsData.forEach(article => {
+                            if (article.named_entities && Array.isArray(article.named_entities)) {
+                                article.named_entities.forEach(entity => namedEntitySet.add(entity));
+                            }
+                        });
+
+                        statusDiv.textContent = `✅ ${newsData.length}件の記事を読み込みました。検索が可能です。`;
+                        searchInput.disabled = false;
+                        searchButton.disabled = false;
+                    } catch (error) {
+                        console.error('JSONLファイルのパースに失敗しました:', error);
+                        statusDiv.textContent = '❌ ファイルの形式が正しくありません。';
+                    } finally {
+                        hideLoader();
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            // --- Gemini API ---
+            async function getEmbedding(text) {
+                // Gemini Embedding (gemini-embedding-001)
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY}`;
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'models/gemini-embedding-001',
+                            content: { parts: [{ text }] }
+                        })
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error((errorData.error && errorData.error.message) || `APIリクエストエラー: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    // Handle both newer and older response shapes
+                    const vec = (data.embeddings && data.embeddings[0] && (data.embeddings[0].values || data.embeddings[0].value))
+                        || (data.embedding && (data.embedding.values || data.embedding.value));
+                    if (!vec || !Array.isArray(vec)) {
+                        throw new Error('想定外のEmbeddingレスポンス形式です');
+                    }
+                    return vec;
+                } catch (error) {
+                    console.error('Embedding APIエラー:', error);
+                    alert(`APIリクエストに失敗しました: ${error.message}\nAPIキーやネットワーク状態を確認してください。`);
+                    return null;
+                }
+            }
+
+            // --- 計算ロジック ---
+            function dotProduct(vecA, vecB) {
+                let product = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    product += vecA[i] * vecB[i];
+                }
+                return product;
+            }
+
+            function magnitude(vec) {
+                return Math.sqrt(dotProduct(vec, vec));
+            }
+
+            function cosineSimilarity(vecA, vecB) {
+                if (!vecA || !vecB) return 0;
+                return dotProduct(vecA, vecB) / (magnitude(vecA) * magnitude(vecB));
+            }
+
+            function escapeRegExp(str) {
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+            function includesEntityExact(query, entity) {
+                if (!entity) return false;
+                const e = entity.trim();
+                if (!e) return false;
+                // If ASCII-ish (spaces/latin/digits/underscore/hyphen), use word boundaries
+                const asciiish = /^[A-Za-z0-9_\-\. ]+$/.test(e);
+                if (asciiish) {
+                    const pattern = new RegExp(`(^|\\b)${escapeRegExp(e)}(\\b|$)`, 'i');
+                    return pattern.test(query);
+                }
+                // For languages without spaces (e.g., Japanese), fallback to substring
+                return query.includes(e);
+            }
+            function renderEntityChips(containerEl, entities) {
+                containerEl.innerHTML = '';
+                if (!entities || entities.length === 0) {
+                    containerEl.style.display = 'none';
+                    return;
+                }
+                containerEl.style.display = 'flex';
+                entities.slice(0, 20).forEach(e => {
+                    const chip = document.createElement('span');
+                    chip.className = 'chip';
+                    chip.textContent = e;
+                    containerEl.appendChild(chip);
+                });
+            }
+
+            // --- 検索実行 ---
+            async function performSearch() {
+                const query = searchInput.value.trim();
+                if (!query) {
+                    alert('検索フレーズを入力してください。');
+                    return;
+                }
+                if (newsData.length === 0) {
+                    alert('先にJSONLファイルをアップロードしてください。');
+                    return;
+                }
+
+                const entityHintsEl = document.getElementById('entity-hints');
+
+                showLoader();
+                clearResults();
+
+                const queryVector = await getEmbedding(query);
+                if (!queryVector) {
+                    hideLoader();
+                    return;
+                }
+
+                const queryEntities = [...namedEntitySet].filter(ent => ent && includesEntityExact(query, ent));
+                // 固有名詞の中で1文字だけのものは除外する
+                const filteredQueryEntities = queryEntities.filter(e => e.length > 1);
+                // 固有名詞チップを表示
+                renderEntityChips(entityHintsEl, filteredQueryEntities);
+
+                // スコア計算
+                const scoredArticles = newsData.map(article => {
+                    const headlineSim = cosineSimilarity(queryVector, article.headline_vector);
+                    const contentSim = cosineSimilarity(queryVector, article.content_vector);
+                    const ne = Array.isArray(article.named_entities) ? article.named_entities : [];
+                    // named_entitiesの中で１文字だけのものは除外する
+                    const filteredEntities = ne.filter(e => e.length > 1);
+                    const entityMatches = Math.min(queryEntities.filter(e => filteredEntities.includes(e)).length, 3); // 最大3ポイントまで
+                    // スコアの重み付け（ヘッドラインと本文は同等、固有名詞の一致は0.5ポイント → 100点満点に圧縮）
+                    const totalScore = (headlineSim + contentSim + (entityMatches * 0.5)) * (100 / 3.5);
+                    return { ...article, score: totalScore };
+                });
+
+                // ソートして上位7件を取得
+                scoredArticles.sort((a, b) => b.score - a.score);
+                const topResults = scoredArticles.slice(0, 7);
+
+                displayResults(topResults);
+                displayRandomQuestions(topResults);
+                hideLoader();
+            }
+            
+            function clearResults() {
+                resultsDiv.innerHTML = '';
+                questionsDiv.innerHTML = '';
+                resultsTitle.style.display = 'none';
+                questionsTitle.style.display = 'none';
+            }
+
+            // --- 結果表示 ---
+            function displayResults(results) {
+                resultsTitle.style.display = 'block';
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<p>該当する記事が見つかりませんでした。</p>';
+                    return;
+                }
+
+                results.forEach((article, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.style.animationDelay = `${index * 0.1}s`;
+                    
+                    const subject = article.subject_codes && article.subject_codes.length > 0 ? `主題: ${article.subject_codes[0].subject}` : '';
+                    const series = article.series_line ? `シリーズ: ${article.series_line}` : '';
+                    const date = article.first_created ? article.first_created.split('T')[0] : '不明';
+
+                    item.innerHTML = `
+                        <h3>${article.headline || 'タイトルなし'}</h3>
+                        <div class="meta-info">
+                            ${subject ? `<span>${subject}</span>` : ''}
+                            ${series ? `<span>${series}</span>` : ''}
+                            <span>作成日: ${date}</span>
+                        </div>
+                        <div class="score">スコア: ${article.score.toFixed(4)}</div>
+                    `;
+                    item.addEventListener('click', () => openModal(article));
+                    resultsDiv.appendChild(item);
+                });
+            }
+
+            function displayRandomQuestions(results) {
+                const allQuestions = results
+                    .filter(a => a.questions && a.questions.length > 0)
+                    .flatMap(a => a.questions.map(q => q.question));
+
+                if (allQuestions.length > 0) {
+                    questionsTitle.style.display = 'block';
+                    // shuffle and pick top 5
+                    const randomQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 5);
+                    
+                    randomQuestions.forEach((q, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'question-box';
+                        item.textContent = q;
+                        item.style.animationDelay = `${0.5 + index * 0.2}s`;
+                        questionsDiv.appendChild(item);
+                    });
+                }
+            }
+            
+            // --- モーダル処理 ---
+            function openModal(article) {
+                modalBody.innerHTML = ''; // コンテンツをクリア
+
+                const date = article.first_created ? article.first_created.split('T')[0] : '不明';
+                const modalHeader = `
+                    <div class="modal-header">
+                        <h2>${article.headline || 'タイトルなし'}</h2>
+                        <p class="sub-headline">${article.sub_headline || ''}</p>
+                        <div class="meta-info" style="font-size: 0.8em; margin-top: 10px;">
+                           <span>作成日: ${date}</span>
+                           <span>提供: ${article.provider_id || ''}</span>
+                        </div>
+                    </div>`;
+
+                const modalContent = `<div class="modal-body"><p>${article.content || 'コンテンツがありません。'}</p></div>`;
+
+                // 関連記事の計算
+                const relatedArticles = newsData
+                    .filter(item => item.id !== article.id && (item.content_vector || item.headline_vector))
+                    .map(related => {
+                        const baseA = article.content_vector || article.headline_vector;
+                        const baseB = related.content_vector || related.headline_vector;
+                        const similarity = cosineSimilarity(baseA, baseB);
+                        return { ...related, similarity };
+                    })
+                    .sort((a, b) => b.similarity - a.similarity)
+                    .slice(0, 5);
+
+                // まずヘッダ＋本文だけを描画
+                modalBody.innerHTML = modalHeader + modalContent;
+
+                // 関連記事セクション（DOMで構築してイベントを保持）
+                const relatedContainer = document.createElement('div');
+                relatedContainer.className = 'related-articles';
+                const h4 = document.createElement('h4');
+                h4.textContent = '関連性の高い記事';
+                relatedContainer.appendChild(h4);
+
+                if (relatedArticles.length > 0) {
+                    relatedArticles.forEach(rel => {
+                        const btn = document.createElement('button');
+                        btn.className = 'related-article-btn';
+                        btn.textContent = rel.headline || 'タイトルなし';
+                        btn.addEventListener('click', () => {
+                            // いったん閉じてから次の記事モーダルを開く
+                            closeModal();
+                            setTimeout(() => openModal(rel), 150);
+                        });
+                        relatedContainer.appendChild(btn);
+                    });
+                } else {
+                    const p = document.createElement('p');
+                    p.textContent = '関連記事は見つかりませんでした。';
+                    relatedContainer.appendChild(p);
+                }
+
+                modalBody.appendChild(relatedContainer);
+                modal.style.display = 'block';
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+            }
+
+            initialize();
+        });
+    </script>
+</body>
+</html>

@@ -147,7 +147,7 @@
 
     .app-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: clamp(18px, 3vw, 24px);
     }
 
@@ -213,9 +213,6 @@
 
       section.apps > h2 {
         text-align: left;
-      }
-      .app-grid {
-        grid-template-columns: 1fr;
       }
     }
 
@@ -303,7 +300,7 @@
     </section>
 
     <footer class="footer glass">
-      <p>2つのニュース学習アプリと2つの検索プロトタイプをこのページからすぐに体験できます。</p>
+      <p>2 つのニュース学習アプリをこのページからすぐに試せます。</p>
     </footer>
   </main>
 </body>

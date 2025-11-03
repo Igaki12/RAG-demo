@@ -147,7 +147,7 @@
 
     .app-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: clamp(18px, 3vw, 24px);
     }
 
@@ -214,9 +214,6 @@
       section.apps > h2 {
         text-align: left;
       }
-      .app-grid {
-        grid-template-columns: 1fr;
-      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -278,32 +275,13 @@
             <li><span class="label" data-icon="△">違い</span>クイズ先行のフローで、解答前にネットワーク図へ移動して証拠記事を探すか、そのまま答えを見るか選べます。</li>
           </ul>
         </article>
-        <article class="app-card glass">
-          <h3><a href="RAG-hybrid-demo3.html">ハイブリッドRAGサーチ</a></h3>
-          <p class="summary">ベクトル距離と固有名詞スコアをブレンドし、欲しい記事を浮かび上がらせる検索プロトタイプ。</p>
-          <ul class="details">
-            <li><span class="label" data-icon="◆">視点</span>Gemini Embeddingsと固有表現マッチングを掛け合わせ、関連ニュースを滑らかに並べ替えます。</li>
-            <li><span class="label" data-icon="◆">操作</span>アップロードした記事から質問候補を生み出し、モーダルで全文・関連記事を散策できます。</li>
-          </ul>
-          <p class="summary" style="font-size:12px">※ このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
-        </article>
 
-        <article class="app-card glass">
-          <h3><a href="RAG-QA-demo2.html">ベーシックRAGサーチ</a></h3>
-          <p class="summary">検索とクイズがひと続きになったRAG体験プロトタイプ。拾い上げたニュースで理解を確かめながら読み深めます。</p>
-          <ul class="details">
-            <li><span class="label" data-icon="◆">視点</span>Gemini埋め込みで再ランキングした記事を、検索→クイズ→根拠確認までワンフローで味わえる構成です。</li>
-            <li><span class="label" data-icon="◆">操作</span>上位7件のカードからモーダルを開き、理解度ボタンと解答表示を切り替えながら本文・関連ニュースを掘れます。</li>
-          </ul>
-          <p class="summary" style="font-size:12px">※ このアプリをテストする場合はベクトル付きJSONL（例:news_articles_qa_type1_embed.jsonl）を使用してください。</p>
-        </article>
-
-
+        
       </div>
     </section>
 
     <footer class="footer glass">
-      <p>2つのニュース学習アプリと2つの検索プロトタイプをこのページからすぐに体験できます。</p>
+      <p>2 つのニュース学習アプリをこのページからすぐに試せます。</p>
     </footer>
   </main>
 </body>
