@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>JSONL News QA Viewer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem;
+      background: #f4f6fb;
+      color: #1f2933;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.75rem;
+    }
+
+    label[for="fileInput"] {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 9999px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    label[for="fileInput"]:hover {
+      background: #1d4ed8;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .summary {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      background: #eef2ff;
+      color: #312e81;
+      font-size: 0.95rem;
+      white-space: pre-line;
+    }
+
+    .entries {
+      margin-top: 2rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .entry {
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 1.5rem;
+      background: #f8fafc;
+    }
+
+    .entry header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .entry h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: #0f172a;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+
+    .content {
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .questions {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .question {
+      padding: 1rem;
+      border-radius: 8px;
+      background: #ede9fe;
+      border: 1px solid #ddd6fe;
+    }
+
+    .question h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      color: #3730a3;
+    }
+
+    .choices {
+      margin: 0;
+      padding-left: 1rem;
+    }
+
+    .choices li {
+      margin-bottom: 0.25rem;
+    }
+
+    .error-list {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 8px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>JSONL News QA Viewer</h1>
+    <p>ニュースのJSONLファイルを選択すると、各記事と対応するクエスチョンが整形して表示されます。</p>
+
+    <label for="fileInput">
+      JSONLファイルを選択
+      <input type="file" id="fileInput" accept=".jsonl,.json">
+    </label>
+
+    <div id="summary" class="summary" hidden></div>
+    <div id="errors" class="error-list" hidden></div>
+    <section id="entries" class="entries" aria-live="polite"></section>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const summaryEl = document.getElementById('summary');
+    const errorsEl = document.getElementById('errors');
+    const entriesEl = document.getElementById('entries');
+
+    fileInput.addEventListener('change', handleFileSelection);
+
+    function handleFileSelection(event) {
+      const [file] = event.target.files;
+
+      if (!file) {
+        return;
+      }
+
+      clearDisplay();
+      summaryEl.hidden = false;
+      summaryEl.textContent = `読み込み中: ${file.name}`;
+
+      const reader = new FileReader();
+      reader.onload = () => processJSONL(reader.result, file.name);
+      reader.onerror = () => displayError(`ファイルを読み込めませんでした: ${reader.error?.message ?? '不明なエラー'}`);
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function processJSONL(rawText, fileName) {
+      const lines = rawText.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      const parsedEntries = [];
+      const parseErrors = [];
+
+      lines.forEach((line, index) => {
+        try {
+          const json = JSON.parse(line);
+          parsedEntries.push({ lineNumber: index + 1, data: json });
+        } catch (error) {
+          parseErrors.push({ lineNumber: index + 1, message: error.message });
+        }
+      });
+
+      renderSummary({ fileName, totalLines: lines.length, parsed: parsedEntries.length, errors: parseErrors.length });
+      renderErrors(parseErrors);
+      renderEntries(parsedEntries);
+    }
+
+    function renderSummary({ fileName, totalLines, parsed, errors }) {
+      summaryEl.hidden = false;
+      summaryEl.textContent =
+        `ファイル名: ${fileName}\n` +
+        `総行数: ${totalLines}\n` +
+        `パース成功: ${parsed}\n` +
+        `パース失敗: ${errors}`;
+    }
+
+    function renderErrors(errors) {
+      if (!errors.length) {
+        errorsEl.hidden = true;
+        errorsEl.textContent = '';
+        return;
+      }
+
+      const messages = errors
+        .slice(0, 20)
+        .map((err) => `行 ${err.lineNumber}: ${err.message}`)
+        .join('\n');
+
+      errorsEl.hidden = false;
+      errorsEl.textContent = `パースに失敗した行（最大20件まで表示）:\n${messages}`;
+    }
+
+    function renderEntries(entries) {
+      entriesEl.innerHTML = '';
+
+      if (!entries.length) {
+        entriesEl.innerHTML = '<p>表示できるデータがありません。</p>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+
+      entries.forEach(({ lineNumber, data }) => {
+        const article = document.createElement('article');
+        article.className = 'entry';
+
+        const header = document.createElement('header');
+        const heading = document.createElement('h2');
+        heading.textContent = data.headline ?? '（見出しなし）';
+        header.appendChild(heading);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.appendChild(createMetaTag('行', `#${lineNumber}`));
+        if (data.news_item_id) {
+          meta.appendChild(createMetaTag('ID', data.news_item_id));
+        }
+        if (data.date_time) {
+          meta.appendChild(createMetaTag('更新', data.date_time));
+        }
+        if (data.provider_id) {
+          meta.appendChild(createMetaTag('提供', data.provider_id));
+        }
+
+        header.appendChild(meta);
+        article.appendChild(header);
+
+        if (data.sub_headline) {
+          const subHeadline = document.createElement('p');
+          subHeadline.textContent = data.sub_headline;
+          subHeadline.style.margin = '0 0 0.75rem';
+          subHeadline.style.fontWeight = '600';
+          article.appendChild(subHeadline);
+        }
+
+        if (data.content) {
+          const content = document.createElement('div');
+          content.className = 'content';
+          content.textContent = data.content;
+          article.appendChild(content);
+        }
+
+        if (Array.isArray(data.questions) && data.questions.length) {
+          const questionsContainer = document.createElement('div');
+          questionsContainer.className = 'questions';
+
+          data.questions.forEach((item, idx) => {
+            const questionBlock = document.createElement('div');
+            questionBlock.className = 'question';
+
+            const questionTitle = document.createElement('h3');
+            questionTitle.textContent = `Q${idx + 1}. ${item.question ?? '（質問内容なし）'}`;
+            questionBlock.appendChild(questionTitle);
+
+            if (Array.isArray(item.choices) && item.choices.length) {
+              const choiceList = document.createElement('ul');
+              choiceList.className = 'choices';
+              item.choices.forEach((choice, choiceIndex) => {
+                const choiceItem = document.createElement('li');
+                choiceItem.textContent = `${String.fromCharCode(65 + choiceIndex)}. ${choice}`;
+                choiceList.appendChild(choiceItem);
+              });
+              questionBlock.appendChild(choiceList);
+            }
+
+            questionsContainer.appendChild(questionBlock);
+          });
+
+          article.appendChild(questionsContainer);
+        }
+
+        fragment.appendChild(article);
+      });
+
+      entriesEl.appendChild(fragment);
+    }
+
+    function createMetaTag(label, value) {
+      const metaItem = document.createElement('span');
+      metaItem.textContent = `${label}: ${value}`;
+      return metaItem;
+    }
+
+    function displayError(message) {
+      summaryEl.hidden = false;
+      summaryEl.textContent = message;
+    }
+
+    function clearDisplay() {
+      summaryEl.hidden = true;
+      summaryEl.textContent = '';
+      errorsEl.hidden = true;
+      errorsEl.textContent = '';
+      entriesEl.innerHTML = '';
+    }
+  </script>
+</body>
+</html>
+
