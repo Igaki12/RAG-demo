@@ -351,51 +351,28 @@
       letter-spacing: 0.04em;
     }
 
-    .choice-grid {
-      display: grid;
-      gap: 12px;
-      margin: 20px 0;
-    }
-
-    .choice-button {
-      padding: 14px 18px;
+    #quiz-feedback button {
+      font-size: 24px;
+      padding: 10px 26px;
       border-radius: 12px;
       border: 2px solid var(--glass-border);
-      background: rgba(255, 255, 255, 0.92);
-      font-size: 16px;
-      font-weight: 600;
-      text-align: left;
       cursor: pointer;
-      transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
-      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+      margin: 0 10px;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+      box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
     }
 
-    .choice-button:hover:not([disabled]) {
-      transform: translateY(-1px);
-      border-color: var(--accent-glow);
-      box-shadow: 0 16px 28px rgba(14, 165, 233, 0.18);
-      color: var(--accent-glow);
+    #quiz-feedback button:hover {
+      transform: scale(1.06);
+      box-shadow: 0 16px 26px rgba(14, 165, 233, 0.18);
     }
 
-    .choice-button.correct {
-      background: rgba(187, 247, 208, 0.9);
-      border-color: rgba(22, 163, 74, 0.65);
-      color: rgb(22, 101, 52);
+    #good-btn {
+      background-color: rgba(187, 247, 208, 0.9);
     }
 
-    .choice-button.incorrect {
-      background: rgba(254, 226, 226, 0.9);
-      border-color: rgba(220, 38, 38, 0.45);
-      color: rgb(153, 27, 27);
-    }
-
-    .choice-button[disabled] {
-      cursor: default;
-      opacity: 0.95;
-    }
-
-    #quiz-feedback {
-      font-weight: 600;
+    #bad-btn {
+      background-color: rgba(254, 202, 202, 0.9);
     }
 
     #quiz-result {
@@ -594,8 +571,13 @@
         <div id="quiz-view" hidden>
           <p id="quiz-progress"></p>
           <p id="quiz-question"></p>
-          <div id="quiz-choices" class="choice-grid"></div>
-          <div id="quiz-feedback" class="answer-box" hidden></div>
+          <button id="show-answer-btn" class="btn-primary" style="margin: 20px 0;">解答を確認する</button>
+          <div id="quiz-answer" class="answer-box" hidden></div>
+          <div id="quiz-feedback" hidden>
+            <p>記事について理解できましたか？</p>
+            <button id="good-btn">👍 理解できた</button>
+            <button id="bad-btn">👎 理解できなかった</button>
+          </div>
           <button id="toggle-article-btn" class="btn-primary" style="margin-top: 40px;" hidden>根拠となる記事を確認する</button>
         </div>
         <!-- Result View -->
@@ -616,9 +598,9 @@
       </header>
       <div class="dialog-content" id="random-content">
         <p id="random-question-text"></p>
-        <div id="random-choices" class="choice-grid"></div>
-        <div id="random-feedback" class="answer-box" hidden></div>
+        <div id="random-answer" class="answer-box" hidden></div>
         <div style="text-align:center; margin-top:24px;">
+          <button id="random-show-answer-btn" class="btn-primary" style="margin:20px 0;">解答を確認する</button>
           <button id="random-open-article-btn" class="btn-primary">どんなニュース記事なのか確認する</button>
         </div>
       </div>
@@ -656,8 +638,11 @@
     const quizView = $('quiz-view');
     const quizProgress = $('quiz-progress');
     const quizQuestion = $('quiz-question');
-    const quizChoices = $('quiz-choices');
+    const showAnswerBtn = $('show-answer-btn');
+    const quizAnswer = $('quiz-answer');
     const quizFeedback = $('quiz-feedback');
+    const goodBtn = $('good-btn');
+    const badBtn = $('bad-btn');
     const quizResult = $('quiz-result');
     const resultIcon = $('result-icon');
     const resultText = $('result-text');
@@ -666,8 +651,8 @@
     const toggleArticleBtn = $('toggle-article-btn');
     const randomModal = $('random-modal');
     const randomQuestionText = $('random-question-text');
-    const randomChoices = $('random-choices');
-    const randomFeedback = $('random-feedback');
+    const randomAnswer = $('random-answer');
+    const randomShowAnswerBtn = $('random-show-answer-btn');
     const randomOpenArticleBtn = $('random-open-article-btn');
 
     // ====== State ======
@@ -715,63 +700,6 @@
       const gg = Math.floor(g * f).toString(16).padStart(2, '0');
       const bb = Math.floor(b * f).toString(16).padStart(2, '0');
       return `#${rr}${gg}${bb}`;
-    }
-
-    function shuffleArray(arr) {
-      const copy = arr.slice();
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      return copy;
-    }
-
-    function normalizeMultipleChoiceQuestion(raw) {
-      if (!raw || typeof raw.question !== 'string') return null;
-      if (!Array.isArray(raw.choices) || raw.choices.length === 0) return null;
-      const trimmed = raw.choices
-        .filter(choice => typeof choice === 'string' && choice.trim().length > 0);
-      if (trimmed.length === 0) return null;
-      return {
-        question: raw.question,
-        choices: trimmed.map((text, idx) => ({ text, isCorrect: idx === 0 }))
-      };
-    }
-
-    function renderChoiceButtons(container, choices, onSelect) {
-      container.innerHTML = '';
-      choices.forEach((choice) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'choice-button';
-        btn.textContent = choice.text;
-        btn.dataset.correct = choice.isCorrect ? 'true' : 'false';
-        btn.addEventListener('click', () => onSelect(choice, btn));
-        container.appendChild(btn);
-      });
-    }
-
-    function handleChoiceSelection(container, button, choice, correctText, onResult) {
-      if (container.dataset.locked === 'true') return;
-      container.dataset.locked = 'true';
-
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const correctButton = buttons.find(btn => btn.dataset.correct === 'true');
-
-      buttons.forEach(btn => {
-        btn.disabled = true;
-      });
-
-      if (choice.isCorrect) {
-        button.classList.add('correct');
-        onResult(true, correctText, correctButton);
-      } else {
-        button.classList.add('incorrect');
-        if (correctButton && correctButton !== button) {
-          correctButton.classList.add('correct');
-        }
-        onResult(false, correctText, correctButton);
-      }
     }
 
     // ====== File Processing ======
@@ -1077,14 +1005,12 @@
     });
 
     startQuizBtn.addEventListener('click', () => {
-      const normalizedQuestions = (currentQuiz.article.questions || [])
-        .map(normalizeMultipleChoiceQuestion)
-        .filter(Boolean);
-      if (normalizedQuestions.length === 0) {
+      const questions = currentQuiz.article.questions;
+      if (!questions || questions.length === 0) {
         finishQuiz(true);
         return;
       }
-      currentQuiz.questions = normalizedQuestions;
+      currentQuiz.questions = questions;
       currentQuiz.qIndex = 0;
       currentQuiz.good = 0;
       currentQuiz.bad = 0;
@@ -1102,38 +1028,40 @@
       articleActions.hidden = true;
     });
 
+    showAnswerBtn.addEventListener('click', () => {
+      showAnswerBtn.hidden = true;
+      quizAnswer.hidden = false;
+      quizFeedback.hidden = false;
+    });
+
     function showNextQuestion() {
       if (currentQuiz.qIndex >= currentQuiz.questions.length) {
         finishQuiz();
         return;
       }
 
+      showAnswerBtn.hidden = false;
+      quizAnswer.hidden = true;
       quizFeedback.hidden = true;
-      delete quizChoices.dataset.locked;
-      quizChoices.innerHTML = '';
       updateArticleVisibilityDuringQuiz(false);
 
       const q = currentQuiz.questions[currentQuiz.qIndex];
       quizProgress.textContent = `問題 ${currentQuiz.qIndex + 1} / ${currentQuiz.questions.length}`;
       quizQuestion.textContent = q.question;
-      const shuffledChoices = shuffleArray(q.choices);
-      const correctText = q.choices.find(choice => choice.isCorrect)?.text || '';
-      renderChoiceButtons(quizChoices, shuffledChoices, (choice, button) => {
-        handleChoiceSelection(quizChoices, button, choice, correctText, (isCorrect) => {
-          quizFeedback.textContent = isCorrect ? '正解です！' : `正解は「${correctText}」です。`;
-          quizFeedback.hidden = false;
-          if (isCorrect) {
-            currentQuiz.good++;
-          } else {
-            currentQuiz.bad++;
-          }
-          setTimeout(() => {
-            currentQuiz.qIndex++;
-            showNextQuestion();
-          }, 1400);
-        });
-      });
+      quizAnswer.textContent = q.answer;
     }
+
+    goodBtn.addEventListener('click', () => {
+      currentQuiz.good++;
+      currentQuiz.qIndex++;
+      showNextQuestion();
+    });
+
+    badBtn.addEventListener('click', () => {
+      currentQuiz.bad++;
+      currentQuiz.qIndex++;
+      showNextQuestion();
+    });
 
     function finishQuiz(forceSuccess = false) {
       const isSuccess = forceSuccess || currentQuiz.good >= currentQuiz.bad;
@@ -1193,6 +1121,10 @@
     }
 
     randomQuestionBtn.addEventListener('click', handleRandomQuestion);
+    randomShowAnswerBtn.addEventListener('click', () => {
+      randomShowAnswerBtn.hidden = true;
+      randomAnswer.hidden = false;
+    });
     randomOpenArticleBtn.addEventListener('click', () => {
       closeRandomModal();
       if (randomState.article) {
@@ -1215,31 +1147,14 @@
         return;
       }
       const article = candidates[Math.floor(Math.random() * candidates.length)];
-      const rawQuestion = article.questions[Math.floor(Math.random() * article.questions.length)];
-      const normalizedQuestion = normalizeMultipleChoiceQuestion(rawQuestion);
-      if (!normalizedQuestion) {
-        alert('この問題は選択肢を表示できません。別の問題をお試しください。');
-        return;
-      }
+      const question = article.questions[Math.floor(Math.random() * article.questions.length)];
       randomState.article = article;
-      randomState.question = normalizedQuestion;
-      renderRandomQuestion(normalizedQuestion);
-      openRandomModal();
-    }
-
-    function renderRandomQuestion(question) {
+      randomState.question = question;
       randomQuestionText.textContent = question.question || '問題がありません。';
-      randomFeedback.hidden = true;
-      delete randomChoices.dataset.locked;
-      randomChoices.innerHTML = '';
-      const shuffled = shuffleArray(question.choices);
-      const correctText = question.choices.find(choice => choice.isCorrect)?.text || '';
-      renderChoiceButtons(randomChoices, shuffled, (choice, button) => {
-        handleChoiceSelection(randomChoices, button, choice, correctText, (isCorrect) => {
-          randomFeedback.textContent = isCorrect ? '正解です！' : `正解は「${correctText}」です。`;
-          randomFeedback.hidden = false;
-        });
-      });
+      randomAnswer.textContent = question.answer || '解答がありません。';
+      randomShowAnswerBtn.hidden = false;
+      randomAnswer.hidden = true;
+      openRandomModal();
     }
 
     function openRandomModal() {

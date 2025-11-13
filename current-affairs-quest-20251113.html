@@ -301,53 +301,6 @@
       color: var(--muted);
     }
 
-    .choice-grid {
-      display: grid;
-      gap: 10px;
-      margin: 10px 0 6px;
-    }
-
-    .choice-button {
-      padding: 12px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      background: rgba(255, 255, 255, 0.96);
-      text-align: left;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
-      box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1);
-    }
-
-    .choice-button:hover:not([disabled]) {
-      transform: translateY(-1px);
-      border-color: var(--accent);
-      box-shadow: 0 16px 32px rgba(14, 165, 233, 0.18);
-      color: var(--accent-hover);
-    }
-
-    .choice-button.correct {
-      background: rgba(187, 247, 208, 0.9);
-      border-color: rgba(22, 163, 74, 0.6);
-      color: rgb(21, 128, 61);
-    }
-
-    .choice-button.incorrect {
-      background: rgba(254, 226, 226, 0.9);
-      border-color: rgba(220, 38, 38, 0.5);
-      color: rgb(185, 28, 28);
-    }
-
-    .choice-button[disabled] {
-      cursor: default;
-      opacity: 0.95;
-    }
-
-    #choice-feedback {
-      font-weight: 600;
-      color: rgb(30, 64, 175);
-    }
-
     .answer-panel {
       display: grid;
       gap: 12px;
@@ -654,8 +607,6 @@
             <span id="question-headline"></span>
           </div>
         </div>
-        <div id="quiz-choices" class="choice-grid"></div>
-        <div id="choice-feedback" hidden></div>
         <div class="btn-row">
           <button id="show-answer-btn" class="btn-secondary" disabled>解答解説を表示</button>
           <button id="open-network-btn" class="btn-primary" disabled>根拠となる記事を探す</button>
@@ -718,8 +669,6 @@
     const quizQuestion = $('quiz-question');
     const questionDate = $('question-date');
     const questionHeadline = $('question-headline');
-    const quizChoices = $('quiz-choices');
-    const choiceFeedback = $('choice-feedback');
     const showAnswerBtn = $('show-answer-btn');
     const openNetworkBtn = $('open-network-btn');
     const answerPanel = $('answer-panel');
@@ -788,71 +737,6 @@
       const gg = Math.floor(g * factor).toString(16).padStart(2, '0');
       const bb = Math.floor(b * factor).toString(16).padStart(2, '0');
       return `#${rr}${gg}${bb}`;
-    }
-
-    function shuffleArray(arr) {
-      const copy = arr.slice();
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      return copy;
-    }
-
-    function normalizeMultipleChoiceQuestion(raw) {
-      if (!raw) return null;
-      const questionText = (typeof raw.question === 'string' && raw.question.trim().length > 0)
-        ? raw.question.trim()
-        : (typeof raw.prompt === 'string' && raw.prompt.trim().length > 0
-          ? raw.prompt.trim()
-          : null);
-      if (!questionText) return null;
-      if (!Array.isArray(raw.choices) || raw.choices.length === 0) return null;
-      const cleanedChoices = raw.choices
-        .filter(choice => typeof choice === 'string' && choice.trim().length > 0)
-        .map(choice => choice.trim());
-      if (cleanedChoices.length === 0) return null;
-      return {
-        prompt: questionText,
-        choices: cleanedChoices.map((text, idx) => ({ text, isCorrect: idx === 0 })),
-        explanation: typeof raw.explanation === 'string'
-          ? raw.explanation
-          : (typeof raw.reasoning === 'string' ? raw.reasoning : ''),
-        original: raw
-      };
-    }
-
-    function renderChoiceButtons(container, choices, onSelect) {
-      container.innerHTML = '';
-      choices.forEach(choice => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'choice-button';
-        btn.textContent = choice.text;
-        btn.dataset.correct = choice.isCorrect ? 'true' : 'false';
-        btn.addEventListener('click', () => onSelect(choice, btn));
-        container.appendChild(btn);
-      });
-    }
-
-    function handleChoiceSelection(container, button, choice, correctText, onResult) {
-      if (container.dataset.locked === 'true') return;
-      container.dataset.locked = 'true';
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const correctButton = buttons.find(btn => btn.dataset.correct === 'true');
-      buttons.forEach(btn => {
-        btn.disabled = true;
-      });
-      if (choice.isCorrect) {
-        button.classList.add('correct');
-        onResult(true, correctText, correctButton);
-      } else {
-        button.classList.add('incorrect');
-        if (correctButton && correctButton !== button) {
-          correctButton.classList.add('correct');
-        }
-        onResult(false, correctText, correctButton);
-      }
     }
 
     // ====== Events ======
@@ -1061,10 +945,9 @@
       for (const article of articles) {
         if (!articleMatchesNetworkContext(article, context)) continue;
         if (Array.isArray(article.questions)) {
-          for (const rawQuestion of article.questions) {
-            const normalized = normalizeMultipleChoiceQuestion(rawQuestion);
-            if (normalized) {
-              pool.push({ article, question: normalized });
+          for (const question of article.questions) {
+            if (question && (question.question || question.prompt)) {
+              pool.push({ article, question });
             }
           }
         }
@@ -1180,7 +1063,7 @@
 
       const choice = questionPool[Math.floor(Math.random() * questionPool.length)];
       currentCard = choice;
-      quizQuestion.textContent = choice.question?.prompt || '問題文が登録されていません。';
+      quizQuestion.textContent = choice.question.question || choice.question.prompt || '問題文が登録されていません。';
       questionDate.textContent = `日付: ${formatDate(choice.article.date_id)}`;
       questionHeadline.textContent = choice.article.headline ? `記事: ${choice.article.headline}` : '記事: 見出しなし';
 
@@ -1196,60 +1079,19 @@
       answerArticleHeadline.textContent = '';
       answerArticleDate.textContent = '';
       answerArticleEntities.textContent = '';
-
-      choiceFeedback.hidden = true;
-      choiceFeedback.textContent = '';
-      delete quizChoices.dataset.locked;
-      quizChoices.innerHTML = '';
-
-      if (choice.question && Array.isArray(choice.question.choices)) {
-        const shuffledChoices = shuffleArray(choice.question.choices);
-        const correctText = choice.question.choices.find(entry => entry.isCorrect)?.text || '';
-        renderChoiceButtons(quizChoices, shuffledChoices, (selectedChoice, button) => {
-          handleChoiceSelection(quizChoices, button, selectedChoice, correctText, (isCorrect) => {
-            choiceFeedback.textContent = isCorrect ? '正解です！' : `正解は「${correctText}」です。`;
-            choiceFeedback.hidden = false;
-            setTimeout(() => {
-              revealAnswer();
-            }, 400);
-          });
-        });
-      }
     }
 
     function revealAnswer() {
       const { article, question } = currentCard;
       if (!article || !question) return;
 
-      const correctChoice = Array.isArray(question.choices)
-        ? question.choices.find(choice => choice.isCorrect)
-        : null;
-      answerText.textContent = correctChoice?.text || '解答情報が登録されていません。';
-      const explanationMessage = question.explanation
-        || (question.original && (question.original.explanation || question.original.reasoning));
-      if (explanationMessage) {
+      answerText.textContent = question.answer || '解答情報が登録されていません。';
+      if (question.explanation || question.reasoning) {
         explanationBlock.hidden = false;
-        explanationText.textContent = explanationMessage;
+        explanationText.textContent = question.explanation || question.reasoning;
       } else {
         explanationBlock.hidden = true;
         explanationText.textContent = '';
-      }
-
-      const buttons = Array.from(quizChoices.querySelectorAll('button'));
-      if (buttons.length > 0) {
-        buttons.forEach(btn => {
-          btn.disabled = true;
-          if (btn.dataset.correct === 'true') {
-            btn.classList.add('correct');
-          }
-        });
-        quizChoices.dataset.locked = 'true';
-      }
-      if (choiceFeedback.hidden) {
-        choiceFeedback.textContent = correctChoice?.text
-          ? `正解は「${correctChoice.text}」です。`
-          : '正解を表示できません。';
-        choiceFeedback.hidden = false;
       }
 
       answerArticleHeadline.textContent = article.headline || '見出しなし';
