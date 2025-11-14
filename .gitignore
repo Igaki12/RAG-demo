@@ -1,2 +1,11 @@
-*.jsonl
-*.json
+# Build artifacts
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
