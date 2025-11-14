@@ -41,9 +41,84 @@
 
 ## React デモアプリ開発方針（次フェーズ）
 
-- 既存の HTML ベース実装と同等の機能（JSONL アップロード、ネットワーク可視化、3 択理解度テスト）を React コンポーネントとして再構築します。
-- アカウント機能を実装し、ログイン / ログアウト状態に連動した UI 制御を行います。認証バックエンドの有無が未確定な場合はダミー実装で進め、要件が固まり次第差し替えます。
-- ユーザー単位で正答率・網羅率を記録し、問題カテゴリ別や時系列の成績を確認できるようにします。将来的な難易度調整（適応型出題）のため、問題メタデータと正答履歴を保存できる API インターフェースを検討してください。
-- CBT（Computer Based Testing）スタイルで常時受験可能にし、受験直後に全体順位（例：上位◯パーセント）を提示できるランキング機能を目指します。集計仕様・データ保持期間について不明点があれば事前に確認を取ってください。
-- React 版ではアカウント認証を前提としてJSONファイルは内部からの読み込みとしますが、将来的な API 連携を考慮し、ファイル取り扱いロジックを専用サービス層に切り出しておくとスムーズです。
-- 上記仕様のうち未確定項目（例：認証方式、成績データの保存場所、ランキング算出の詳細など）がある場合は、実装前に必ずオーナーへ確認してください。
+### 公開・ビルド方針
+
+- GitHub Pages（`/docs` ディレクトリ公開）を前提とし、Vite + React + TypeScript 構成でプロジェクトを生成します。ビルド成果物は `vite.config.ts` で `base` を `/RAG-demo/` に設定し、`npm run build` 時に `dist` → `docs` へ出力（`"build": "vite build && cp -R dist/* docs/"` など）する運用を徹底してください。
+- UI ライブラリは Chakra UI を採用します。テーマは PC 向けワイド画面での視認性を優先し、ブレークポイントは Chakra のデフォルトを活かしながら主要ブレークポイント（md/lg）での配置崩れを重点確認します。
+- JSON データはリポジトリ内 `src/data` から静的 import で読み込み、将来の API 化に備えて取得ロジックはサービス層に分離します。
+- vis-network は公式パッケージ（`vis-network`）を使用し、React では `useRef` + `useEffect` で DOM を制御します。既存 HTML 実装のノードサイズやエッジ生成ロジックを TypeScript へ移植し、同じ計算手順を再利用してください。
+
+```
+/docs
+  ├─ index.html          # GitHub Pages 公開用にビルドされたエントリ
+  └─ assets/…            # Vite ビルド成果物
+/src
+  ├─ components/         # UI コンポーネント
+  ├─ features/           # ドメインごとの状態管理ロジック
+  ├─ hooks/              # 共通フック
+  ├─ layout/             # レイアウト系
+  ├─ lib/vis/            # vis-network 初期化・ユーティリティ
+  ├─ routes/             # ページコンポーネント
+  ├─ services/           # 認証・データ取得など（localStorage 実装を内包）
+  ├─ store/              # Zustand など状態管理ライブラリを採用する場合はここに配置
+  └─ data/               # JSONL 変換済み静的データ
+```
+
+### 認証・アカウント仕様
+
+- サインアップ／メール認証はダミーとし、ログインのみ実働します。以下 3 アカウントを `src/services/auth/accounts.ts` にハードコードで保持し、メールアドレス＋パスワード認証を行います。
+  - `student.alpha+demo01@example.com` / `NewsQuest#01`（表示名: `Student Alpha`）
+  - `analyst.bravo+demo02@example.com` / `NewsQuest#02`（表示名: `Analyst Bravo`）
+  - `mentor.charlie+demo03@example.com` / `NewsQuest#03`（表示名: `Mentor Charlie`）
+- ログイン後はヘッダー右上などにユーザー名と `Logout` ボタンのみをミニマム表示し、その他の認証関連 UI は折りたたみます。メール確認／再設定ボタンはプレースホルダーとして設置し、現状はモーダルで「現在は未対応です」と通知するだけに留めてください。
+- 認証状態は React Query もしくは Zustand などでグローバル管理しつつ、`localStorage` に `ragDemo.auth.session`（現在ログイン中のメールアドレス）として永続化します。将来の API 移行に備え、サービス層ではストレージ操作をカプセル化し、後日 fetch 実装に差し替えやすい形を保ちます。
+
+### プレイ履歴・成績データ管理
+
+- `localStorage` には `ragDemo.progress.<userEmail>` キーで JSON を保存します。スキーマ例：
+  ```json
+  {
+    "attempts": [
+      {
+        "dateId": "20251114",
+        "questionId": "commonsense-20251114-001",
+        "selectedChoice": 2,
+        "isCorrect": true,
+        "answeredAt": "2025-11-14T12:34:56.000Z"
+      }
+    ],
+    "lastPlayedAt": "2025-11-14T12:34:56.000Z",
+  }
+  ```
+- 集計結果（正解率・網羅率・ランキング順位・プレイ日数）はメモ化セレクタで算出し、画面表示時に都度計算します。将来のサーバ同期では同スキーマをそのまま API へ POST できるように保ちます。
+- 問題セットの網羅率は「同一日付で提供される総問題数に対する回答済み数」、全体順位は他アカウントの問題数と比較してリアルタイムに順位づけします（ローカル環境では 3 アカウントのデータから算出）。
+
+### コア UI コンポーネント
+
+- `AppLayout`：PC 向け 2 カラムレイアウトをベースに、グラフをセンターに大きく配置し、補助情報カードを四隅にフローティング表示。スマホでは補助コンポーネントを FAB から Drawer/Modal で表示。
+- `AuthGate`：未ログイン時はフルスクリーンでログインフォーム（メール・パスワード）＋確認ボタン。ログイン後は子要素を描画。
+- `AuthStatusChip`：ログイン後の最小表示（表示名＋`Logout`）。
+- `NetworkGraph`：vis-network を利用し、`current-affairs-quest-latest.html` の node/edge 構築ロジック（ノードサイズ計算、エッジ重み）を TypeScript に移植。ノードクリックで該当質問をイベント発火。
+- `DateMultiSelector`：カレンダー UI（Chakra の `Calendar` 相当ライブラリ、なければ `react-day-picker` など）で複数日付選択に対応。選択日はハイライトし、グラフと問題一覧へフィルタを適用。
+- `QuizPanel`：選択したノードに紐づくクイズを表示。選択肢は初期表示時にシャッフルし、回答後は正誤を旧 GOOD/BAD 演出に合わせて Chakra の `Alert` / `Toast` で再現。解説（`explanation`/`reasoning`）があれば折りたたみ表示。
+- `ArticleDetailModal`：記事本文や named entities を表示する既存モーダル挙動を再現。
+- `PerformanceSummary`：総解答数・正解率・網羅率・順位・プレイ日数をカード表示。PC では右下にフローティング固定、スマホでは Drawer から表示。
+- `ProgressTimeline`：日別の解答数をスパークラインで表示し、将来の時系列分析に備えます。
+
+### 画面遷移と状態
+
+- ルート構成は `routes/AppShell.tsx`（メイン画面）と、将来の `routes/Admin.tsx` など拡張に備えて React Router を導入。現時点ではシングルページ構成で問題ありません。
+- グローバル状態管理は小規模のためまずは React Context + Reducer で十分。拡張が見込まれる場合は Zustand を導入し `store/authStore.ts`, `store/progressStore.ts` に分離します。
+- データロード時は `services/data/newsService.ts` で JSON を読み込み、エンティティから vis-network 用の nodes/edges を生成するユーティリティを `lib/vis/transformers.ts` に配置します。
+
+### レスポンシブ・アクセシビリティ指針
+
+- PC（幅 1280px 以上）ではグラフ領域を 70% 幅で確保し、補助カードは `position: absolute` ではなく Chakra の `useBreakpointValue` を用いた `Stack` 配置で、アニメーションや focus 循環が途切れないようにします。既存 HTML のキーボード操作を踏襲してください。
+- スマホ（幅 < 768px）ではグラフを縦長に再配置し、補助情報は FAB → Drawer/Modal に移行。Drawer オープン時にはスクリーンリーダー向けにタイトルと閉じるボタンへ `aria` 属性を付与します。
+- ノードクリック時のフィードバック、正解／不正解時のアニメーションは既存挙動とビジュアルを合わせ、必要に応じて Chakra の `Motion` コンポーネント（`framer-motion` 連携）で再現してください。
+
+### 将来拡張・確認事項
+
+- ランキング機能（上位◯パーセント表示）はローカルデータからの暫定計算で実装しつつ、API 化時には全ユーザー集計が必要になるため、ソート前提のデータ構造と計算手順を `services/analytics/ranking.ts` として切り出します。
+- 認証方式、成績データの永続化先、ランキング算出ロジックが確定していない場合はオーナーに確認してから着手してください。特にメール認証フローを実装する場合は GitHub Pages 上でのフロント単体実装では限界があるため、外部サービス（Firebase Auth 等）の採用可否を事前に調整します。
+- 旧 HTML との整合性確認として、同一 JSONL を読み込ませた際にノード数・エッジ数・クイズ件数が一致するかを E2E テスト（Playwright など）で将来的に追加予定です。現段階では手動検証でもかまいませんが、テスト観点は残しておいてください。
