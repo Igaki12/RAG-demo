@@ -23,7 +23,9 @@
 ## 現行Web UI仕様（HTML/CSS/JS）
 
 - 対象ファイルは `commonsense-latest.html`、`current-affairs-quest-latest.html`、`index.html`（必要に応じてサブページ）です。更新前に必ず日付付きバックアップを作成してください。
-- 利用者は JSONL ファイルをアップロードし、ニュース記事の共起ネットワーク図と理解度テストを体験します。
+- 利用者は JSONL ファイルをアップロードし、ニュース記事の共起ネットワーク図と理解度テストを体験します。アプリは利用者がアップロードした JSONL のみをデータソースとし、リポジトリ同梱データを自動読み込みしないでください。
+- アップロード UI は filters パネルの最上部に配置し、ファイルが正常に読み込まれたら自動的に非表示へ切り替えます（再アップロードはメニューや設定モーダルなど別導線で対応）。
+- データがまだ読み込まれていない場合は、ネットワークグラフ・クイズ・サマリーカードをスケルトン／プレースホルダー表示にし、アップロード完了後に初めて実データを描画します。
 - 理解度テストは 3 択形式で、JSONL 内の `choices` 配列の先頭要素を正解として扱います。表示時はシャッフルし、正解選択時は旧「GOOD」挙動、不正解時は旧「BAD」挙動を踏襲してください。
 - ランダム出題や記事詳細モーダルなど既存の UI/UX 挙動は維持しつつ、問題表示・フィードバック領域のみ新仕様に合わせてあります。編集時は既存アニメーション・アクセシビリティ属性を壊さないよう注意してください。
 
@@ -33,6 +35,7 @@
 - `questions` は配列で、各要素は最低限 `question`（文字列）と `choices`（文字列配列）を持ちます。`choices[0]` が正解であることが前提です。任意で `explanation` または `reasoning` を含められます。
 - 共起ネットワーク計算は `named_entities` を前提に行います。エンティティは重複を避け、意味のある文字列のみを格納してください。
 - 新旧フォーマットが混在する場合は、新フォーマット（`news_full_mcq3_type9_entities_novectors.jsonl` に準拠）が優先です。旧フォーマットを扱うページを改修する際は、正解が単一文字列で提供されるケースへのフォールバックを検討してください。
+- アップロードバリデーションでは `.jsonl` 拡張子／テキスト MIME を確認し、ファイルサイズ上限は 8MB とします（`news_full_mcq3_type9_entities_novectors.jsonl` は約 6.5MB なので必ず通過）。行単位で JSON をパースし、主要キーが欠けていても致命的エラーにせず、利用者に修正ポイントを伝える形で寛容に扱ってください。
 
 ## 対象ユーザーと目的
 
@@ -45,7 +48,7 @@
 
 - GitHub Pages（`/docs` ディレクトリ公開）を前提とし、Vite + React + TypeScript 構成でプロジェクトを生成します。ビルド成果物は `vite.config.ts` で `base` を `/RAG-demo/` に設定し、`npm run build` 時に `dist` → `docs` へ出力（`"build": "vite build && cp -R dist/* docs/"` など）する運用を徹底してください。
 - UI ライブラリは Chakra UI を採用します。テーマは PC 向けワイド画面での視認性を優先し、ブレークポイントは Chakra のデフォルトを活かしながら主要ブレークポイント（md/lg）での配置崩れを重点確認します。
-- JSON データはリポジトリ内 `src/data` から静的 import で読み込み、将来の API 化に備えて取得ロジックはサービス層に分離します。
+- JSON データは利用者がアップロードした JSONL ファイルのみを `services/data/newsService.ts`（または同等のサービス層）経由で読み込みます。ファイル選択・ドラッグ＆ドロップ後に `File` → 文字列 → レコード配列へ変換し、拡張子確認と 8MB 制限のバリデーションもこの層で集中管理してください。`news_full_mcq3_type9_entities_novectors.jsonl` は QA／検証用サンプルとして `public/` に保持しますが、UI からは自動読み込みしません。
 - vis-network は公式パッケージ（`vis-network`）を使用し、React では `useRef` + `useEffect` で DOM を制御します。既存 HTML 実装のノードサイズやエッジ生成ロジックを TypeScript へ移植し、同じ計算手順を再利用してください。
 
 ```
@@ -61,7 +64,7 @@
   ├─ routes/             # ページコンポーネント
   ├─ services/           # 認証・データ取得など（localStorage 実装を内包）
   ├─ store/              # Zustand など状態管理ライブラリを採用する場合はここに配置
-  └─ data/               # JSONL 変換済み静的データ
+  └─ data/               # JSONL スキーマ定義・モック（実データはユーザーアップロードのみ）
 ```
 
 ### 認証・アカウント仕様
@@ -96,6 +99,7 @@
 ### コア UI コンポーネント
 
 - `AppLayout`：PC 向け 2 カラムレイアウトをベースに、グラフをセンターに大きく配置し、補助情報カードを四隅にフローティング表示。スマホでは補助コンポーネントを FAB から Drawer/Modal で表示。
+- `UploadPanel`：filters パネル最上部に固定し、`.jsonl` ファイル選択とドラッグ＆ドロップを受け付けます。アップロードが成功しデータが注入された時点で自動的に非表示となり、代わりに再アップロードボタンを補助メニューへ移してください。
 - `AuthGate`：未ログイン時はフルスクリーンでログインフォーム（メール・パスワード）＋確認ボタン。ログイン後は子要素を描画。
 - `AuthStatusChip`：ログイン後の最小表示（表示名＋`Logout`）。
 - `NetworkGraph`：vis-network を利用し、`current-affairs-quest-latest.html` の node/edge 構築ロジック（ノードサイズ計算、エッジ重み）を TypeScript に移植。ノードクリックで該当質問をイベント発火。
@@ -109,7 +113,7 @@
 
 - ルート構成は `routes/AppShell.tsx`（メイン画面）と、将来の `routes/Admin.tsx` など拡張に備えて React Router を導入。現時点ではシングルページ構成で問題ありません。
 - グローバル状態管理は小規模のためまずは React Context + Reducer で十分。拡張が見込まれる場合は Zustand を導入し `store/authStore.ts`, `store/progressStore.ts` に分離します。
-- データロード時は `services/data/newsService.ts` で JSON を読み込み、エンティティから vis-network 用の nodes/edges を生成するユーティリティを `lib/vis/transformers.ts` に配置します。
+- データロード時は `services/data/newsService.ts` でアップロード済み `File` を読み込み、エンティティから vis-network 用の nodes/edges を生成するユーティリティを `lib/vis/transformers.ts` に配置します。未アップロード時は `undefined` を返し、UI 側はプレースホルダー状態を描画してください。
 
 ### レスポンシブ・アクセシビリティ指針
 
@@ -126,7 +130,7 @@
 ### 実装状況メモ（2025-11-14 時点）
 
 - React/Vite ベースのデモ UI を `src/` 以下に追加済み。`npm run dev` でローカル起動、`npm run build` 後に `docs/` へ成果物コピー。
-- データセットは `public/news_full_mcq3_type9_entities_novectors.jsonl` に配置し、`services/data/newsService.ts` から取得（`import.meta.env.BASE_URL` に追従）。
+- `public/news_full_mcq3_type9_entities_novectors.jsonl` はアップロードバリデーションや回帰テスト用のリファレンスファイルとして保持します。実行時は必ず利用者がアップロードした JSONL を `services/data/newsService.ts` から読み込むようにしてください。
 - 認証デモ用ハードコードアカウントは `src/features/auth/accounts.ts` に定義：
   - `student.alpha+demo01@example.com` / `NewsQuest#01` （Student Alpha）
   - `analyst.bravo+demo02@example.com` / `NewsQuest#02` （Analyst Bravo）
