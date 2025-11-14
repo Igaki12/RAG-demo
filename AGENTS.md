@@ -122,3 +122,14 @@
 - ランキング機能（上位◯パーセント表示）はローカルデータからの暫定計算で実装しつつ、API 化時には全ユーザー集計が必要になるため、ソート前提のデータ構造と計算手順を `services/analytics/ranking.ts` として切り出します。
 - 認証方式、成績データの永続化先、ランキング算出ロジックが確定していない場合はオーナーに確認してから着手してください。特にメール認証フローを実装する場合は GitHub Pages 上でのフロント単体実装では限界があるため、外部サービス（Firebase Auth 等）の採用可否を事前に調整します。
 - 旧 HTML との整合性確認として、同一 JSONL を読み込ませた際にノード数・エッジ数・クイズ件数が一致するかを E2E テスト（Playwright など）で将来的に追加予定です。現段階では手動検証でもかまいませんが、テスト観点は残しておいてください。
+
+### 実装状況メモ（2025-11-14 時点）
+
+- React/Vite ベースのデモ UI を `src/` 以下に追加済み。`npm run dev` でローカル起動、`npm run build` 後に `docs/` へ成果物コピー。
+- データセットは `public/news_full_mcq3_type9_entities_novectors.jsonl` に配置し、`services/data/newsService.ts` から取得（`import.meta.env.BASE_URL` に追従）。
+- 認証デモ用ハードコードアカウントは `src/features/auth/accounts.ts` に定義：
+  - `student.alpha+demo01@example.com` / `NewsQuest#01` （Student Alpha）
+  - `analyst.bravo+demo02@example.com` / `NewsQuest#02` （Analyst Bravo）
+  - `mentor.charlie+demo03@example.com` / `NewsQuest#03` （Mentor Charlie）
+- ログイン状態は `AuthProvider`（`src/features/auth/AuthContext.tsx`）が管理し、`ragDemo.auth.session` キーで `localStorage` 永続化。サインアップや再設定ボタンはトースト表示のみのダミー。
+- 旧 HTML 群は `legacy-html/` 以下へ退避済み。編集時は命名規則（`*-YYYYMMDD.html` バックアップ）を維持しつつ、React 側と混在させないこと。

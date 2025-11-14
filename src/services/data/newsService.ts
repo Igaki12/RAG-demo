@@ -13,7 +13,8 @@ export type NewsRecord = {
   questions: NewsQuestion[];
 };
 
-const DATA_URL = new URL('news_full_mcq3_type9_entities_novectors.jsonl', import.meta.env.BASE_URL).toString();
+const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+const DATA_URL = `${basePath}/news_full_mcq3_type9_entities_novectors.jsonl`;
 
 let cachedRecords: NewsRecord[] | null = null;
 
