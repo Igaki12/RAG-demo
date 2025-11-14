@@ -13,31 +13,57 @@ export type NewsRecord = {
   questions: NewsQuestion[];
 };
 
-const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
-const DATA_URL = `${basePath}/news_full_mcq3_type9_entities_novectors.jsonl`;
-
-let cachedRecords: NewsRecord[] | null = null;
-
-function parseJsonl(text: string): NewsRecord[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as NewsRecord);
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
-export async function fetchNewsRecords(): Promise<NewsRecord[]> {
-  if (cachedRecords) {
-    return cachedRecords;
+function isNewsQuestion(value: unknown): value is NewsQuestion {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.question === 'string' && isStringArray(candidate.choices) && candidate.choices.length > 0;
+}
+
+function isNewsRecord(value: unknown): value is NewsRecord {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.date_id === 'string' &&
+    typeof candidate.headline === 'string' &&
+    typeof candidate.content === 'string' &&
+    isStringArray(candidate.named_entities) &&
+    Array.isArray(candidate.questions) &&
+    candidate.questions.every(isNewsQuestion)
+  );
+}
+
+export function parseNewsRecords(text: string): NewsRecord[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) {
+    throw new Error('JSONLにレコードが含まれていません。');
   }
 
-  const response = await fetch(DATA_URL);
-  if (!response.ok) {
-    throw new Error(`ニュースデータの取得に失敗しました: ${response.status}`);
-  }
+  const records = lines.map((line, index) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch (error) {
+      throw new Error(`行 ${index + 1} のJSONを解析できませんでした。`);
+    }
 
-  const text = await response.text();
-  const records = parseJsonl(text);
-  cachedRecords = records;
+    if (!isNewsRecord(parsed)) {
+      throw new Error(`行 ${index + 1} が想定フォーマットと一致しません。`);
+    }
+
+    return parsed;
+  });
+
   return records;
 }

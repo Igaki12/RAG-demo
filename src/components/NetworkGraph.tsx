@@ -27,6 +27,9 @@ function NetworkGraph({ nodes, edges, selectedNodeId, onNodeSelect }: NetworkGra
 
     const options: Options = {
       autoResize: true,
+      layout: {
+        improvedLayout: false
+      },
       nodes: {
         shape: 'dot',
         scaling: {
