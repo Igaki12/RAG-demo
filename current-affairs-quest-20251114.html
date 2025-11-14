@@ -1324,17 +1324,6 @@
       }
 
       const context = currentNetworkContext;
-      const totalCount = context.topEntities.reduce(
-        (sum, entity) => sum + (context.entityCount.get(entity) || 0),
-        0
-      );
-      const maxCount = context.topEntities.reduce(
-        (max, entity) => {
-          const count = context.entityCount.get(entity) || 0;
-          return count > max ? count : max;
-        },
-        0
-      );
       const nodes = context.topEntities.map(entity => {
         const count = context.entityCount.get(entity) || 0;
         const subjectMap = context.entitySubjectCounts?.get(entity);
@@ -1343,7 +1332,7 @@
         return {
           id: entity,
           label: entity,
-          value: scaleValue(count, totalCount, maxCount),
+          value: scaleValue(count),
           title: `出現回数: ${count}`,
           color: { background: bgColor, border: darkerBorder(bgColor) }
         };
@@ -1495,16 +1484,9 @@
       }
     }
 
-    function scaleValue(count, totalCount, maxCount) {
-      const min = 12;
-      const max = 48;
-      if (!count || count <= 0 || !totalCount || totalCount <= 0) return min;
-      const ratio = Math.min(count / totalCount, 1);
-      const logNormalized = maxCount > 0
-        ? Math.log(count + 1) / Math.log(maxCount + 1)
-        : ratio;
-      const blended = (ratio + logNormalized) / 2;
-      return min + (max - min) * blended;
+    function scaleValue(count) {
+      if (!count || count <= 1) return 12;
+      return Math.log(count) * 12 + 12;
     }
 
     function normalizeDate(value) {
