@@ -1,0 +1,27 @@
+- 21:45 初期作業ログ開始。AGENTS.md を確認。
+- 21:46 deploy ユーザーを作成し sudo グループへ追加。
+- 21:46 /home/deploy/.ssh/authorized_keys を作成し root 鍵を複製。パーミッション 700/600 を適用。
+- 21:46 sshd_config を確認し `PermitRootLogin prohibit-password` / `PasswordAuthentication no` を維持したまま sshd を reload。
+- 21:46 ローカル `~/.ssh/config` で Host health-discovery 設定は手元端末作業のため保留（利用者キー共有待ち）。
+- 21:55 `apt update` を実行しパッケージ情報を最新化。
+- 21:55 `apt upgrade -y` 実行中にタイムアウトしたため `dpkg --configure -a` で処理を完了し、残る systemd/udev 系 8 パッケージは保留状態（後続再起動時に適用予定）。
+- 21:56 `apt install -y build-essential git curl unzip ufw` を実行し基本ツールを確認、未導入だった unzip のみ追加。
+- 21:56 UFW で OpenSSH/80/443 を許可後に enable→`ufw status verbose` で疎通ルールを確認し、現在の SSH セッションを維持したまま有効化完了。
+- 22:07 deploy ユーザー環境で nvm (v0.39.7) をインストール。
+- 22:07 nvm を用いて Node.js LTS (v24.11.1) を導入し、node/npm の動作を確認。
+- 22:07 npm global で pnpm (10.22.0) / pm2 (6.0.13) をインストールし、ホームディレクトリからバージョンを確認。
+- 22:14 `apt install -y mysql-server` を実行中に dpkg が mysqld ロックで停止したため、プロセスを停止→`dpkg --configure -a` で完了させ mysql.service を enable/start。
+- 22:15 `mysql_secure_installation --use-default` を適用し、匿名ユーザー削除・テストDB削除・rootリモート拒否など標準ハードニングを完了。
+- 22:15 rag_demo データベースと `ragdemo_app`@`%` を作成し、強固なパスワード `RagDemoApp!2025` を割り当て→users テーブルと 3 アカウントを投入。
+- 22:15 `/srv/rag-demo` 配下に app/docs/dist を deploy 所有で作成し、`/var/www/rag-demo` と `/var/log/rag-demo` も準備（DocumentRoot は www-data 所有に変更）。
+- 22:23 /srv/rag-demo/app を pnpm create vite で初期化し、pnpm install→`pnpm run build` でデフォルト React/Vite がビルド可能なことを確認 (.env に API ベース URL を追加)。
+- 22:23 server/ ディレクトリを作成し npm init→pnpm add express/mysql2/dotenv/cors、index.js と .env を AGENTS 仕様に合わせて実装（listen ホストを 0.0.0.0 固定）。
+- 22:23 pm2 で rag-auth を起動し、`pm2 startup systemd -u deploy --hp /home/deploy`→`pm2 save` を実行。/var/log/rag-demo/pm2 にシンボリックリンクを作成。
+- 22:23 127.0.0.1:3001/api/health への curl で疎通確認を試みたが、この環境のネットワーク制限によりソケット生成が許可されず失敗（pm2 ログ上は正常起動を確認）。
+- 06:46 Vite フロントを再ビルドし dist→/var/www/rag-demo へ rsync、www-data 所有に変更。
+- 06:46 apache2 を導入し、ssl/rewrite/headers/proxy/proxy_http を有効化→`rag-demo.conf` を作成、000-default を無効化して a2ensite→configtest→reload。
+- 06:46 certbot --apache で apex/www 両方の証明書取得を試みたが、www.health-discovery.com の DNS レコードが無いため NXDOMAIN により失敗。
+- 06:46 apex のみで certbot --apache --non-interactive を実行し、証明書を取得→`rag-demo-le-ssl.conf` が生成されたため ServerAlias を削除し http/https 両方で再読み込み。
+- 06:46 `certbot renew --dry-run --no-random-sleep-on-renew` で自動更新の正常性を確認。
+- 06:54 www.health-discovery.com 用の ServerAlias を http/https vhost に再追加し、configtest→reload を実施。
+- 06:54 `certbot --apache -d health-discovery.com -d www.health-discovery.com --expand` を実行したが、Let's Encrypt 側で www の A/AAAA が NXDOMAIN と判定され失敗。DNS 伝播を確認後に再実行が必要。
