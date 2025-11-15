@@ -9,7 +9,8 @@ Health Discovery の公開ドメイン `https://health-discovery.com/`（固定 
 - MySQL 8.x は同一 VPS に設置。サンプル 3 アカウント（`student.alpha+demo01@example.com` など）は DB に格納。  
 - TLS は certbot + Apache プラグインで取得し、自動更新のたびに Apache を reload。  
 - pm2 で Node プロセスを常駐させ、`/var/log/rag-demo/` 以下へログを集約。  
-- JSONL アップロード仕様・UI 方針は `AGENTS.md` を参照（バックアップ運用などのレポルールは変わらず）。
+- JSONL アップロード仕様・UI 方針は `AGENTS.md` を参照（バックアップ運用などのレポルールは変わらず）
+- ファイアウォール（UFW 等）の設定は慎重に。過度に厳格化してリモートログイン不能にならないよう、SSH(22/tcp)・HTTP(80)・HTTPS(443) は常時許可し、ルール変更時は既存 SSH セッションを保持したまま別端末/別セッションで疎通確認してから適用。VPS 管理コンソール等の緊急復旧手段も確保しておくこと。
 
 ## 2. 初期 OS 設定
 
