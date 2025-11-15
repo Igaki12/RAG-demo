@@ -1,6 +1,6 @@
 # AGENTS_for_VPS
 
-Health Discovery の公開ドメイン `https://health-discovery.com/`（固定 IP `162.43.51.135`）を、クリーンインストールした Xserver VPS (Ubuntu 22.04 LTS 想定) 上で React(Vite) + Node.js + MySQL 構成に載せ替えるためのインフラ手順です。旧 Flask 環境は存在しない前提で、ここに書かれた手順だけで初期構築と運用が完結します。
+Health Discovery の公開ドメイン `https://health-discovery.com/`（固定 IP `162.43.51.135`）を、クリーンインストールした Xserver VPS (Ubuntu 25.04 LTS 想定) 上で React(Vite) + Node.js + MySQL 構成に載せ替えるためのインフラ手順です。旧 Flask 環境は存在しない前提で、ここに書かれた手順だけで初期構築と運用が完結します。
 
 ## 1. 基本方針
 
