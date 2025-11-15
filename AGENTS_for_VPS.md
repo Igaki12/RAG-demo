@@ -13,6 +13,18 @@ Health Discovery の公開ドメイン `https://health-discovery.com/`（固定 
 - ファイアウォール（UFW 等）の設定は慎重に。過度に厳格化してリモートログイン不能にならないよう、SSH(22/tcp)・HTTP(80)・HTTPS(443) は常時許可し、ルール変更時は既存 SSH セッションを保持したまま別端末/別セッションで疎通確認してから適用。VPS 管理コンソール等の緊急復旧手段も確保しておくこと。
 
 ## 2. 初期 OS 設定
+### 事前: ChatGPT のユーザ設定（エージェント実行プロファイル）
+
+- リポジトリと運用ルール: RAG-demo の編集・バックアップ命名は AGENTS.md に準拠（`*-latest.html` と日付バックアップ）。
+- 対象環境: health-discovery.com（IP: 162.43.51.135）、Ubuntu 25.04 LTS、Apache で静的配信＋Node.js(API)を `/api` でリバースプロキシ。
+- 作業ユーザー: `deploy` を管理ユーザーとして使用し、sudo 付与。以降の全手順は `deploy` 前提。
+- SSH 方針: `deploy` の公開鍵認証のみ許可。`PermitRootLogin prohibit-password`、`PasswordAuthentication no` に設定後 reload。
+- 接続プロファイル: ローカルの `~/.ssh/config` に `Host health-discovery`（deploy ユーザー、鍵パス指定）を登録して接続統一。
+- プロセス常駐: pm2 は `deploy` で運用し、自動起動は次で登録すること:  
+  `pm2 startup systemd -u deploy --hp /home/deploy`
+- フロント/データ仕様: JSONL は利用者アップロードのみをデータソースとし、自動読み込み禁止（AGENTS.md の UI/バリデーション仕様に従う）。
+
+以降の 1〜5 の初期設定は上記前提のもとで実施する。
 
 1. VPS へ root でログインし、管理ユーザーを作成。
    ```bash
