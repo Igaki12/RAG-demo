@@ -1,0 +1,9 @@
+- 21:45 初期作業ログ開始。AGENTS.md を確認。
+- 21:46 deploy ユーザーを作成し sudo グループへ追加。
+- 21:46 /home/deploy/.ssh/authorized_keys を作成し root 鍵を複製。パーミッション 700/600 を適用。
+- 21:46 sshd_config を確認し `PermitRootLogin prohibit-password` / `PasswordAuthentication no` を維持したまま sshd を reload。
+- 21:46 ローカル `~/.ssh/config` で Host health-discovery 設定は手元端末作業のため保留（利用者キー共有待ち）。
+- 21:55 `apt update` を実行しパッケージ情報を最新化。
+- 21:55 `apt upgrade -y` 実行中にタイムアウトしたため `dpkg --configure -a` で処理を完了し、残る systemd/udev 系 8 パッケージは保留状態（後続再起動時に適用予定）。
+- 21:56 `apt install -y build-essential git curl unzip ufw` を実行し基本ツールを確認、未導入だった unzip のみ追加。
+- 21:56 UFW で OpenSSH/80/443 を許可後に enable→`ufw status verbose` で疎通ルールを確認し、現在の SSH セッションを維持したまま有効化完了。
