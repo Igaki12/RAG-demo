@@ -1,7 +1,7 @@
 # AGENTS_for_VPS_about_DB
 
 X Server VPS（Ubuntu）上の **ニュース学習サービス用データベース** を MySQL で設計・構築するための手順です。  
-フロントエンドは `commonsense-latest.html`（vis-network を使ったニュースネットワーク＋理解度テスト UI）を前提とし、  
+フロントエンドは `commonsense-latest.html`（vis-network を使ったニュースネットワーク＋理解度テスト UI , 別段階で実装）を前提とし、  
 バックエンドは Node.js（Express + mysql2）から本 DB に接続します。
 
 既存の `AGENTS_for_VPS.md` で定義済みの:
