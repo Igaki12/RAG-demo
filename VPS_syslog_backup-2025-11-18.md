@@ -1,0 +1,11 @@
+- 13:25 AGENTS.md / AGENTS_about_DB.md / 2025-11-15 log を再確認し、本日の作業要件（DB スキーマ作成・サンプル表示・ログ追記）を整理。
+- 13:32 /srv/rag-demo/db/schema_news_learning.sql を新規作成し、AGENTS_about_DB.md に記載の 14 テーブル分の DDL を記述。
+- 13:34 mysql -u root < /srv/rag-demo/db/schema_news_learning.sql で rag_demo に DDL を適用し、SHOW TABLES で作成結果を確認。
+- 13:38 subject_codes / entities / articles / article_subject_codes / article_entities へサンプル 3 件を投入し、SELECT で投入データを検証。
+- 13:45 server/index.js に GET /api/articles/sample を追加して記事＋subject_code を JSON 返却できるよう実装。
+- 13:52 React (src/App.jsx / App.css / index.css) を差し替え、API から取得した 3 件のサンプル記事を UI に表示するシンプルなコンポーネントへ更新。
+- 13:55 npm install -g pnpm → pnpm run build を実行し、フロントエンドのビルドが成功することを確認。
+- 13:58 dist を /var/www/rag-demo へ rsync --delete で配置し、www-data 所有権を再設定して公開側にも新 UI を反映。
+- 14:05 deploy ユーザーの pm2 環境を呼び出し、`pm2 restart rag-auth` で Node API を再起動して新しい /api/articles/sample エンドポイントを反映。
+- 14:08 localhost で `curl http://127.0.0.1:3001/api/articles/sample` を試みたが、Codex CLI のネットワーク制限の影響で接続できず（curl: (7)）。ss では 0.0.0.0:3001 の LISTEN を確認済みで、API 自体は稼働中と判断。
+- 14:20 ブラウザから https://health-discovery.com/api/articles/sample へアクセスし、JSON 応答（サンプル3件の headline 等）が表示されることを利用者確認済みと共有。
